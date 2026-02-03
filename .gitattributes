@@ -1,0 +1,4 @@
+api filter=lfs diff=lfs merge=lfs -text
+services/core/api filter=lfs diff=lfs merge=lfs -text
+services/optimization/api filter=lfs diff=lfs merge=lfs -text
+services/ordering/api filter=lfs diff=lfs merge=lfs -text
