@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ordering-service
+  namespace: foodsea
+spec:
+  selector:
+    app: ordering-service
+  ports:
+  - name: http
+    port: 8083
+    targetPort: 8083
+  - name: grpc
+    port: 9093
+    targetPort: 9093
+  type: ClusterIP

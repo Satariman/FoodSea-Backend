@@ -1,0 +1,172 @@
+Metadata-Version: 2.4
+Name: foodsea-ml-service
+Version: 0.1.0
+Summary: FoodSea ml-service (gRPC semantic analog search)
+Requires-Python: <4,>=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: grpcio==1.62.2
+Requires-Dist: grpcio-tools==1.62.2
+Requires-Dist: sentence-transformers==3.0.1
+Requires-Dist: scikit-learn==1.5.1
+Requires-Dist: numpy==1.26.4
+Requires-Dist: protobuf==4.25.3
+Provides-Extra: dev
+Requires-Dist: pytest==8.2.2; extra == "dev"
+
+# ML-Service Tutorial (FoodSea)
+
+Этот учебник объясняет, как работает `ml-service` в проекте FoodSea: какие данные он получает, как строит индекс, как отвечает на gRPC-запросы и где что лежит в коде.
+
+## 1. Зачем нужен ml-service
+
+`ml-service` решает одну задачу: находит товары-аналоги.
+
+Он используется в двух сценариях:
+- карточка товара: показать похожие товары (опционально с приоритетом более дешёвых);
+- оптимизация корзины: подобрать аналоги только из выбранных магазинов.
+
+Сервис не принимает HTTP и не ходит напрямую в БД. Он работает только по gRPC.
+
+## 2. Контракты (protobuf)
+
+Главные контракты:
+- `proto/ml/analogs.proto`
+- `proto/core/catalog.proto`
+
+### Входной API ml-service
+
+`AnalogService`:
+- `GetAnalogs(product_id, top_k, price_aware, filter_store_ids)`
+- `GetBatchAnalogs(product_ids, top_k, filter_store_ids)`
+
+### Откуда ml-service берёт данные
+
+`CatalogService` из `core-service`:
+- `ListProductsForML()` возвращает товары, нутриенты и активные офферы.
+
+## 3. Что происходит при старте
+
+Точка входа: `src/main.py`.
+
+Алгоритм старта:
+1. Создаётся `Config` из env (`src/config.py`).
+2. Пытаемся загрузить готовый индекс из `INDEX_PATH`.
+3. Если индекс не найден:
+   - загружаем товары из `core-service` через gRPC (`src/data_loader.py`),
+   - строим фичи (`src/feature_builder.py`),
+   - строим KNN-индекс (`src/index.py`),
+   - сохраняем индекс на диск.
+4. Поднимается gRPC-сервер и регистрируется `AnalogServicer` (`src/service.py`).
+
+Важно: если `core-service` недоступен и файла индекса нет, сервис всё равно стартует, но с пустым индексом.
+
+## 4. Как устроены данные внутри
+
+`ProductData` (в `src/data_loader.py`) — это плоская модель товара для ML.
+
+Поля:
+- ID, name, description, composition;
+- category/subcategory/brand;
+- nutrition (calories/protein/fat/carbohydrates);
+- offers: `store_id -> price_kopecks`;
+- `min_price_kopecks`.
+
+## 5. Как строятся фичи
+
+Файл: `src/feature_builder.py`.
+
+Для каждого товара строится объединённый вектор:
+- текстовый эмбеддинг (`name + description + composition`) через `sentence-transformers`;
+- нормализованные нутриенты (4 числа);
+- one-hot по категории (с весом `CATEGORY_WEIGHT`);
+- нормализованный вес/объём (парсинг строк вида `500 мл`, `1.5 кг`).
+
+Итог: `feature_vector = [text | nutrition | category | weight]`.
+
+## 6. Как работает поиск аналогов
+
+Файл: `src/index.py`.
+
+Используется `sklearn.neighbors.NearestNeighbors` с cosine distance.
+
+Когда приходит запрос:
+1. Находим вектор исходного товара.
+2. Берём ближайших соседей.
+3. Убираем сам исходный товар из выдачи.
+4. Применяем бизнес-режимы:
+   - `filter_store_ids`: оставляем товары, у которых есть офферы в нужных магазинах;
+   - `price_aware`: корректируем score так, чтобы более дешёвые аналоги получали бонус, а более дорогие штраф.
+5. Сортируем по итоговому `score`.
+
+Возвращаем:
+- `product_id`
+- `product_name`
+- `score`
+- `min_price_kopecks`
+
+## 7. gRPC-методы сервиса
+
+Файл: `src/service.py`.
+
+### `GetAnalogs`
+
+- проверяет, что есть `product_id`;
+- вызывает `index.query(...)`;
+- применяет `MIN_SCORE_THRESHOLD`;
+- возвращает список аналогов.
+
+### `GetBatchAnalogs`
+
+- проверяет, что `product_ids` не пустой;
+- для каждого товара вызывает `index.query(...)`;
+- складывает результат в `analogs_by_product`.
+
+## 8. Переменные окружения
+
+Основные (`src/config.py`):
+- `GRPC_PORT` (по умолчанию `50051`)
+- `CORE_GRPC_ADDR` (по умолчанию `localhost:9091`)
+- `INDEX_PATH` (по умолчанию `data/index.pkl`)
+- `TEXT_MODEL` (`all-MiniLM-L6-v2`)
+- `CATEGORY_WEIGHT` (по умолчанию `3.0`)
+- `NUTRITION_WEIGHT` (по умолчанию `1.5`)
+- `PRICE_PENALTY` (по умолчанию `0.3`)
+- `MIN_SCORE_THRESHOLD` (по умолчанию `0.3`)
+
+## 9. Где смотреть тесты
+
+Каталог: `tests/`.
+
+- `test_feature_builder.py` — размерность векторов, парсинг веса, нормализация.
+- `test_index.py` — поведение KNN, price-aware, фильтрация по магазинам, save/load.
+- `test_service.py` — работа gRPC-методов через реальный in-process gRPC server.
+
+## 10. Быстрый локальный запуск
+
+Из корня репозитория:
+
+```bash
+cd services/ml
+make proto
+python3 -m pytest tests/ -v
+python3 -m src.main
+```
+
+Если `core-service` уже поднят и в нём зарегистрирован `CatalogService`, сервис построит индекс из live-данных.
+
+## 11. Связь с core-service
+
+Чтобы загрузка данных работала, в `core-service` должен быть зарегистрирован `CatalogService` и реализован метод `ListProductsForML`.
+
+Ключевые места в Go-коде:
+- `services/core/internal/modules/catalog/grpc/catalog_server.go`
+- `services/core/internal/modules/catalog/repository/product_repo.go` (`ListAllForML`)
+- `services/core/cmd/api/main.go` (регистрация gRPC-сервера)
+
+## 12. Ментальная модель (кратко)
+
+`ml-service` — это «движок похожести»:
+- он не решает, заменять товар или нет;
+- он не считает доставку и не оптимизирует корзину;
+- он только быстро отвечает: «какие товары максимально похожи, и сколько они стоят (с учётом заданных ограничений)».
+

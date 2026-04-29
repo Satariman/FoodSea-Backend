@@ -1,0 +1,35 @@
+syntax = "proto3";
+package core;
+option go_package = "github.com/foodsea/proto/core";
+
+service CatalogService {
+    // Returns all in-stock products with nutrition and active offers.
+    rpc ListProductsForML(ListProductsForMLRequest) returns (ListProductsForMLResponse);
+}
+
+message ListProductsForMLRequest {}
+
+message ListProductsForMLResponse {
+    repeated ProductFeaturesProto products = 1;
+}
+
+message ProductFeaturesProto {
+    string product_id = 1;
+    string name = 2;
+    string description = 3;
+    string composition = 4;
+    string category_id = 5;
+    string subcategory_id = 6;
+    string brand_id = 7;
+    string weight = 8;
+    double calories = 9;
+    double protein = 10;
+    double fat = 11;
+    double carbohydrates = 12;
+    repeated ProductOfferBrief offers = 13;
+}
+
+message ProductOfferBrief {
+    string store_id = 1;
+    int64 price_kopecks = 2;
+}

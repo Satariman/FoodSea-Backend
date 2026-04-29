@@ -1,0 +1,42 @@
+syntax = "proto3";
+package core;
+option go_package = "github.com/foodsea/proto/core";
+
+service OfferService {
+    rpc GetOffers(GetOffersRequest) returns (GetOffersResponse);
+    rpc GetDeliveryConditions(GetDeliveryConditionsRequest) returns (GetDeliveryConditionsResponse);
+}
+
+message GetOffersRequest {
+    repeated string product_ids = 1;
+}
+
+message GetOffersResponse {
+    repeated OfferProto offers = 1;
+}
+
+message OfferProto {
+    string product_id = 1;
+    string store_id = 2;
+    string store_name = 3;
+    int64 price_kopecks = 4;
+    optional int64 original_price_kopecks = 5;
+    int32 discount_percent = 6;
+    bool in_stock = 7;
+}
+
+message GetDeliveryConditionsRequest {
+    repeated string store_ids = 1;
+}
+
+message GetDeliveryConditionsResponse {
+    repeated DeliveryConditionProto conditions = 1;
+}
+
+message DeliveryConditionProto {
+    string store_id = 1;
+    int64 min_order_kopecks = 2;
+    int64 delivery_cost_kopecks = 3;
+    optional int64 free_from_kopecks = 4;
+    optional int32 estimated_minutes = 5;
+}

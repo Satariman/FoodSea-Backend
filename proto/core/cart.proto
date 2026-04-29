@@ -1,0 +1,40 @@
+syntax = "proto3";
+package core;
+option go_package = "github.com/foodsea/proto/core";
+
+service CartService {
+    rpc GetCartItems(GetCartItemsRequest) returns (GetCartItemsResponse);
+    rpc ClearCart(ClearCartRequest) returns (ClearCartResponse);
+    rpc RestoreCart(RestoreCartRequest) returns (RestoreCartResponse);
+}
+
+message GetCartItemsRequest {
+    string user_id = 1;
+}
+
+message GetCartItemsResponse {
+    repeated CartItemProto items = 1;
+}
+
+message CartItemProto {
+    string product_id = 1;
+    string product_name = 2;
+    int32 quantity = 3;
+}
+
+message ClearCartRequest {
+    string user_id = 1;
+}
+
+message ClearCartResponse {
+    bool success = 1;
+}
+
+message RestoreCartRequest {
+    string user_id = 1;
+    repeated CartItemProto items = 2;
+}
+
+message RestoreCartResponse {
+    bool success = 1;
+}

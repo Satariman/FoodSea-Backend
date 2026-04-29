@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: optimization-config
+  namespace: foodsea
+data:
+  ENV: production
+  SERVER_PORT: "8082"
+  GRPC_PORT: "9092"
+  DB_HOST: optimization-postgres
+  DB_PORT: "5432"
+  DB_NAME: optimization_db
+  REDIS_URL: redis://redis:6379/1
+  KAFKA_BROKERS: kafka:9092
+  CORE_GRPC_ADDR: core-service:9091
+  ML_GRPC_ADDR: ml-service:50051

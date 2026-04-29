@@ -1,22 +1,24 @@
 # Binaries
+bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-main
 
 # Test binary
 *.test
 
-# Output of the go coverage tool
+# Coverage
 *.out
+coverage.html
+coverage.xml
 
 # Dependency directories
 vendor/
 
-# Go workspace file
-go.work
+# Go workspace sum
+go.work.sum
 
 # IDE
 .idea/
@@ -28,14 +30,47 @@ go.work
 # Environment variables
 .env
 .env.local
+.env.*.local
 
 # Build artifacts
 dist/
 build/
 
-# Swagger docs (will be generated)
-docs/
+# Ent generated code (keep schema/, generate.go, entc.go)
+services/*/ent/*.go
+services/*/ent/predicate/
+services/*/ent/runtime/
+services/*/ent/migrate/
+services/*/ent/hook/
+services/*/ent/privacy/
+services/*/ent/enttest/
+
+# Swagger (generated)
+services/*/docs/swagger/
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
 
+# Node (if any tooling)
+node_modules/
+
+# Atlas
+*.sum
+
+# ML index artifacts
+services/ml/data/*.pkl
+!services/ml/data/.gitkeep
+
+# Local AI/tooling docs and reports
+.claude/
+claude.md
+CLAUDE.md
+agents.md
+AGENTS.md
+reports/
+**/architecture-notes*.md
+**/architecture_notes*.md

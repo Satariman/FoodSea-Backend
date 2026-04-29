@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ordering-service
+  namespace: foodsea
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ordering-service
+  template:
+    metadata:
+      labels:
+        app: ordering-service
+    spec:
+      containers:
+      - name: ordering
+        image: foodsea/ordering-service:latest
+        ports:
+        - containerPort: 8083
+          name: http
+        - containerPort: 9093
+          name: grpc
+        envFrom:
+        - configMapRef:
+            name: ordering-config
+        - secretRef:
+            name: ordering-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

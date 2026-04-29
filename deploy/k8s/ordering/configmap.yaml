@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ordering-config
+  namespace: foodsea
+data:
+  ENV: production
+  SERVER_PORT: "8083"
+  GRPC_PORT: "9093"
+  DB_HOST: ordering-postgres
+  DB_PORT: "5432"
+  DB_NAME: ordering_db
+  REDIS_URL: redis://redis:6379/2
+  KAFKA_BROKERS: kafka:9092
+  CORE_GRPC_ADDR: core-service:9091
+  OPTIMIZATION_GRPC_ADDR: optimization-service:9092

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: optimization-service
+  namespace: foodsea
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: optimization-service
+  template:
+    metadata:
+      labels:
+        app: optimization-service
+    spec:
+      containers:
+      - name: optimization
+        image: foodsea/optimization-service:latest
+        ports:
+        - containerPort: 8082
+          name: http
+        - containerPort: 9092
+          name: grpc
+        envFrom:
+        - configMapRef:
+            name: optimization-config
+        - secretRef:
+            name: optimization-secrets
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi

@@ -1,0 +1,9 @@
+grpcio==1.62.2
+grpcio-tools==1.62.2
+sentence-transformers==3.0.1
+scikit-learn==1.5.1
+numpy==1.26.4
+protobuf==4.25.3
+
+[dev]
+pytest==8.2.2

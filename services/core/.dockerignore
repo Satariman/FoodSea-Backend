@@ -1,0 +1,12 @@
+bin/
+vendor/
+*.md
+.git/
+prompts/
+deploy/
+docs/
+ent/schema/
+migrations/
+coverage.*
+*.log
+.DS_Store

@@ -1,191 +1,267 @@
 # FoodSea Backend
 
-Backend-часть мобильного приложения FoodSea, реализованная на Go с использованием модульной Clean Architecture.
+Backend-платформа FoodSea для iOS-приложения: каталог продуктов, сравнение цен по магазинам, оптимизация корзины и оформление заказа.
 
-## Архитектура
+Проект организован как монорепо с несколькими сервисами и общими protobuf-контрактами.
 
-Проект организован как модульный монолит, где каждый модуль построен по принципам Clean Architecture и содержит следующие слои:
+## 1) Архитектура проекта
 
-- **Domain** — бизнес-логика, сущности (entities) и интерфейсы репозиториев
-- **UseCase** — сценарии использования (use cases), координирующие работу доменных сущностей
-- **Interfaces** — HTTP-обработчики (handlers), DTO для запросов и ответов, валидация
-- **Infrastructure** — реализации репозиториев для PostgreSQL и Redis, HTTP-клиенты для внешних API
+### Сервисы и зоны ответственности
 
-## Структура проекта
+| Сервис | Технология | HTTP | gRPC | Роль |
+|---|---|---:|---:|---|
+| `core-service` | Go | `:8081` | `:9091` | Пользователи, каталог, офферы, корзина, поиск, barcode, изображения |
+| `optimization-service` | Go | `:8082` | `:9092`* | Оптимизация корзины, работа с аналогами, хранение optimization snapshots |
+| `ordering-service` | Go | `:8083` | `:9093` | Заказы и Saga-оркестрация |
+| `ml-service` | Python | — | `:50051` | Поиск аналогов по векторной близости |
 
+`*` В `make dev-all` локально `optimization gRPC` запускается на `:9094` (чтобы не конфликтовать с Kafka на `:9092`).
+
+### Межсервисное взаимодействие
+
+- iOS клиент работает с backend по HTTP (через `core`/`optimization`/`ordering`).
+- Внутри backend сервисы общаются по gRPC (`core` ↔ `optimization` ↔ `ordering` ↔ `ml`).
+- Kafka используется для событий и оркестрации long-running сценариев:
+  - `cart.events` (инвалидация результатов оптимизации при изменении корзины),
+  - `optimization.events`, `order.events`,
+  - `saga.commands`, `saga.replies`.
+- Каждый Go-сервис владеет своей БД (Database-per-Service): `core_db`, `optimization_db`, `ordering_db`.
+
+### Архитектурные принципы
+
+- Clean Architecture внутри Go-модулей.
+- Domain-слой не зависит от Gin/Ent/Kafka/gRPC.
+- Деньги только в `int64` (копейки), без `float`.
+- Sentinel errors + `errors.Is` для межслойной классификации ошибок.
+- Cache-aside: Redis не источник истины.
+- At-least-once обработка Kafka сообщений, идемпотентные обработчики.
+
+## 2) Как работает ML-модель аналогов
+
+`ml-service` строит и обслуживает in-memory KNN-индекс аналогов товаров.
+
+### Источник данных
+
+- Данные берутся из `core-service` по gRPC (`CatalogService.ListProductsForML`).
+- Прямого доступа к SQL у `ml-service` нет.
+
+### Признаки (feature vector)
+
+Для каждого товара строится объединённый вектор из:
+- текстового эмбеддинга (`sentence-transformers`, модель `all-MiniLM-L6-v2`) по `name + description + composition`;
+- нормализованных nutrition-признаков (`calories/protein/fat/carbohydrates`);
+- one-hot категории;
+- нормализованного веса/объёма (парсинг строк вроде `500 мл`, `1 кг`);
+- нормализованного минимального price-признака.
+
+Все компоненты взвешиваются через env-параметры (`TEXT_WEIGHT`, `CATEGORY_WEIGHT`, `NUTRITION_WEIGHT`, `PRICE_WEIGHT`).
+
+### Поиск и ранжирование
+
+- Базовый поиск: `NearestNeighbors(metric="cosine", algorithm="brute")`.
+- Режим `price_aware=true` корректирует score относительно цены исходного товара:
+  - более дешёвые аналоги получают бонус,
+  - более дорогие — штраф.
+- `filter_store_ids` ограничивает кандидатов товарами, доступными в выбранных магазинах.
+- Результаты ниже `MIN_SCORE_THRESHOLD` отбрасываются.
+
+### Жизненный цикл индекса
+
+- При старте `ml-service` пытается загрузить сериализованный индекс (`INDEX_PATH`).
+- Если файла нет, сервис загружает каталог из `core`, строит индекс и сохраняет его на диск.
+- Если `core` временно недоступен и индекса нет, сервис стартует с пустым индексом (возвращает пустые результаты, не падает).
+
+## 3) Как работает алгоритм оптимизации корзины
+
+`optimization-service` реализует алгоритм в `optimizer/algorithm`.
+
+### Основная схема
+
+1. Подготовка входа:
+- цены по магазинам,
+- условия доставки,
+- кандидаты аналогов.
+
+2. Сокращение пространства поиска:
+- используются только магазины, где есть товары корзины;
+- если магазинов слишком много, выбираются top-15 по покрытию корзины.
+
+3. Полный перебор подмножеств магазинов:
+- для каждого subset выполняется жадное назначение товара в минимальную цену внутри subset;
+- неподходящие subset (не покрывают всю корзину) отбрасываются.
+
+4. Multi-move consolidation:
+- система пробует переносить позиции между магазинами,
+- цель: достичь `free delivery` там, где это выгоднее, и уменьшить итоговую сумму `товары + доставка`.
+
+5. Этап аналогов:
+- поверх оптимального распределения предлагаются замены (`substitutions`),
+- учитывается и ценовая дельта, и изменение доставки (включая cross-store сценарии).
+
+6. Timeout fallback:
+- при `context deadline` возвращается лучший найденный результат с `is_approximate=true`.
+
+### Результат оптимизации
+
+В snapshot сохраняются:
+- `assignments` (что и в каком магазине брать),
+- `delivery_kopecks`, `total_kopecks`, `savings_kopecks`,
+- `substitutions` (выгодные аналоги),
+- статус (`active`, `locked`, `expired`) для сценариев ordering Saga.
+
+## 4) Почему выбран именно этот стек
+
+### Go-сервисы
+
+| Инструмент | Почему выбран |
+|---|---|
+| `gin` | Быстрый HTTP-слой с простым middleware pipeline и удобной интеграцией со Swagger |
+| `ent` | Type-safe ORM + строгие схемы + предсказуемая генерация кода |
+| `atlas` | Версионируемые SQL-миграции, удобная связка с Ent |
+| `grpc` + `protobuf` | Строгие межсервисные контракты и компактный транспорт |
+| `kafka-go` | Простой и стабильный Kafka-клиент в Go без лишней инфраструктуры |
+| `go-redis/v9` | Стандартный де-факто клиент Redis для cache-aside сценариев |
+| `golang-jwt/jwt` | Прозрачная и контролируемая JWT-аутентификация |
+| `swaggo` | Генерация OpenAPI/Swagger из кода handler-ов |
+
+### ML-сервис
+
+| Инструмент | Почему выбран |
+|---|---|
+| `sentence-transformers` | Качественные готовые эмбеддинги для семантической близости товаров |
+| `scikit-learn` (`NearestNeighbors`) | Надёжный и понятный KNN для небольшой/средней размерности данных |
+| `numpy` | Быстрая векторная математика для сборки и нормализации признаков |
+| `grpcio` | Нативная и стабильная интеграция Python-сервиса в gRPC-контур Go-сервисов |
+| `pytest` | Быстрые модульные проверки feature-builder/index/service логики |
+
+### Инфраструктура
+
+| Компонент | Почему выбран |
+|---|---|
+| PostgreSQL 16 | Надёжная транзакционная БД для core/ordering/optimization |
+| Redis 7 | Быстрый кэш и хранение TTL-данных |
+| Kafka (Confluent) | Событийная шина и поддержка Saga-аудита |
+| MinIO (S3-compatible) | Локальный и предсказуемый storage для изображений |
+| Docker Compose | Быстрый локальный запуск зависимостей без k8s-overhead |
+| Testcontainers | Интеграционные/e2e тесты в условиях, близких к production runtime |
+
+## 5) Структура репозитория
+
+```text
+services/
+  core/            # API каталога/корзины/партнёров + gRPC Cart/Offer/Catalog
+  optimization/    # API оптимизации + gRPC OptimizationService + cart.events consumer
+  ordering/        # API заказов + Saga orchestration
+  ml/              # Python gRPC analog service
+proto/             # protobuf контракты (общий Go-модуль)
+deploy/            # docker-compose, init topics, k8s manifests
+docs/api/          # экспортированные API-артефакты
+scripts/           # вспомогательные скрипты (в т.ч. swagger regression)
 ```
-foodsea-backend/
-├── cmd/
-│   └── api/
-│       └── main.go              # Точка входа приложения
-├── internal/
-│   ├── modules/                 # Бизнес-модули
-│   │   ├── catalog/            # Каталог товаров
-│   │   │   ├── domain/          # Сущности и интерфейсы
-│   │   │   ├── usecase/        # Бизнес-логика
-│   │   │   ├── interfaces/     # HTTP handlers
-│   │   │   └── infrastructure/ # Реализации репозиториев
-│   │   ├── cart/               # Корзина покупок
-│   │   ├── offers/             # Предложения магазинов
-│   │   ├── search/              # Поиск и фильтрация
-│   │   ├── barcode/            # Поиск по штрихкоду
-│   │   ├── voice/              # Обработка голосовых запросов
-│   │   ├── optimization/        # Оптимизация стоимости корзины
-│   │   ├── analogs/             # Подбор аналогов товаров
-│   │   └── partners/           # Магазины-партнеры
-│   └── platform/               # Общая инфраструктура
-│       ├── config/             # Конфигурация
-│       ├── database/           # Подключение к PostgreSQL
-│       ├── redis/              # Подключение к Redis
-│       └── router/             # HTTP роутинг
-├── Dockerfile
-├── docker-compose.yml
-└── go.mod
-```
 
-## Модули
+## 6) Быстрый старт (локально)
 
-### catalog
-Управление каталогом товаров: товары, категории, бренды/производители.
-
-### cart
-Управление корзиной пользователя: добавление, изменение количества, удаление товаров.
-
-### offers
-Предложения магазинов-партнеров: цены, наличие, акции, условия доставки.
-
-### search
-Поиск и фильтрация товаров по текстовому запросу, категориям, брендам и ценам.
-
-### barcode
-Поиск товара по штрихкоду.
-
-### voice
-Обработка текстовых запросов из голосового ввода: извлечение названий товаров и количеств.
-
-### optimization
-Расчет оптимального распределения товаров корзины по магазинам-партнерам для минимизации стоимости.
-
-### analogs
-Подбор аналогов товаров на основе семантической близости через ML Gateway. .
-
-### partners
-Управление магазинами-партнерами и адаптеры для интеграции с их API.
-
-## Технологии
-
-- **Go 1.21+** — язык программирования
-- **PostgreSQL 12+** — основная база данных
-- **Redis 6.0+** — кэширование
-- **Gin** — HTTP веб-фреймворк
-- **Swagger** — документация API
-- **Docker** — контейнеризация
-
-## Требования
-
-- Go 1.21 или выше
-- Docker и docker-compose (для запуска через Docker)
-- PostgreSQL 12+ (при запуске без Docker)
-- Redis 6.0+ (при запуске без Docker)
-
-## Запуск через Docker
-
-1. Клонируйте репозиторий:
-```bash
-cd "Repo Backend"
-```
-
-2. Запустите все сервисы:
-```bash
-docker-compose up -d
-```
-
-3. Проверьте работоспособность:
-```bash
-curl http://localhost:8085/api/v1/health
-```
-
-4. Откройте Swagger UI:
-```
-http://localhost:8085/swagger/index.html
-```
-
-Или просто откройте в браузере: `http://localhost:8085/` (настроен редирект на Swagger).
-
-## Запуск локально (без Docker)
-
-1. Установите зависимости:
-```bash
-go mod download
-```
-
-2. Настройте переменные окружения (или используйте значения по умолчанию):
-```bash
-export SERVER_PORT=8080
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DB_NAME=foodsea
-export REDIS_HOST=localhost
-export REDIS_PORT=6379
-```
-
-3. Убедитесь, что PostgreSQL и Redis запущены и доступны.
-
-4. Запустите приложение:
-```bash
-go run cmd/api/main.go
-```
-
-## Переменные окружения
-
-| Переменная | Описание | Значение по умолчанию |
-|-----------|----------|----------------------|
-| `SERVER_PORT` | Порт HTTP сервера | `8080` |
-| `SERVER_HOST` | Хост HTTP сервера | `localhost` |
-| `DB_HOST` | Хост PostgreSQL | `localhost` |
-| `DB_PORT` | Порт PostgreSQL | `5432` |
-| `DB_USER` | Пользователь PostgreSQL | `postgres` |
-| `DB_PASSWORD` | Пароль PostgreSQL | `postgres` |
-| `DB_NAME` | Имя базы данных | `foodsea` |
-| `DB_SSLMODE` | Режим SSL для PostgreSQL | `disable` |
-| `REDIS_HOST` | Хост Redis | `localhost` |
-| `REDIS_PORT` | Порт Redis | `6379` |
-| `REDIS_PASSWORD` | Пароль Redis | (пусто) |
-
-## API Endpoints
-
-### Health Check
-- `GET /health` — проверка работоспособности сервера, базы данных и Redis
-
-### Swagger
-- `GET /swagger/index.html` — Swagger UI для просмотра документации API
-
-## Разработка
-
-### Добавление нового модуля
-
-1. Создайте структуру папок в `internal/modules/your-module/`:
-   - `domain/` — сущности и интерфейсы репозиториев
-   - `usecase/` — бизнес-логика
-   - `interfaces/` — HTTP handlers
-   - `infrastructure/` — реализации репозиториев
-
-2. Реализуйте интерфейсы в domain слое.
-
-3. Реализуйте use cases в usecase слое.
-
-4. Создайте HTTP handlers в interfaces слое.
-
-5. Реализуйте репозитории в infrastructure слое.
-
-6. Зарегистрируйте роуты в `internal/platform/router/router.go`.
-
-### Генерация Swagger документации
+### 0. Зависимости
 
 ```bash
-go install github.com/swaggo/swag/cmd/swag@latest
-swag init -g cmd/api/main.go
+make tools
 ```
 
+### 1. Поднять инфраструктуру
+
+```bash
+make dev-infra-up
+```
+
+### 2. Применить миграции
+
+```bash
+make migrate-core
+make migrate-optimization
+make migrate-ordering
+```
+
+### 3. Генерация контрактов и документации
+
+```bash
+make proto
+make swagger
+```
+
+### 4. Запуск сервисов
+
+Вариант A (всё сразу, в фоне, включая `ml-service`):
+
+```bash
+make dev-all
+```
+
+Вариант B (по отдельности):
+
+```bash
+cd services/core && go run ./cmd/api
+cd services/optimization && go run ./cmd/api
+cd services/ordering && go run ./cmd/api
+cd services/ml && make run
+```
+
+### 5. Проверка
+
+- Core health: `http://localhost:8081/health`
+- Optimization health: `http://localhost:8082/health`
+- Ordering health: `http://localhost:8083/health`
+
+Swagger UI:
+- `http://localhost:8081/swagger/index.html`
+- `http://localhost:8082/swagger/index.html`
+- `http://localhost:8083/swagger/index.html`
+
+## 7) Тестирование
+
+```bash
+make test-unit
+make test-integration
+make test-e2e-core
+make test-e2e-ordering
+make test-e2e-optimization
+make test-ml
+```
+
+Полный прогон:
+
+```bash
+make test-all
+```
+
+## 8) Важные env-переменные
+
+Общие:
+- `ENV`, `SERVER_PORT`, `GRPC_PORT`
+- `DB_URL`, `REDIS_URL`, `KAFKA_BROKERS`
+- `JWT_SECRET`
+
+Optimization-specific:
+- `CORE_GRPC_ADDR`, `ML_GRPC_ADDR`
+- `OPTIMIZATION_TIMEOUT`, `RESULT_TTL`
+
+Ordering-specific:
+- `CORE_GRPC_ADDR`, `OPTIMIZATION_GRPC_ADDR`
+- `SAGA_STEP_TIMEOUT`, `SAGA_MAX_COMPENSATION_ATTEMPTS`
+
+ML-specific:
+- `CORE_GRPC_ADDR`, `GRPC_PORT`, `INDEX_PATH`
+- `TEXT_MODEL`, `TEXT_WEIGHT`, `CATEGORY_WEIGHT`, `NUTRITION_WEIGHT`, `PRICE_WEIGHT`, `PRICE_PENALTY`, `MIN_SCORE_THRESHOLD`
+
+## 9) Полезные команды
+
+```bash
+make build
+make lint
+make seed-core
+make stop-all
+make dev-infra-down
+```
+
+---
+
+Если меняется API-контракт (`proto/*.proto`), обязательно запускай `make proto` и проверяй совместимость вызовов между сервисами.

@@ -1,0 +1,40 @@
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - gofumpt
+    - gocritic
+    - errname
+    - nilnil
+    - noctx
+    - bodyclose
+    - sqlclosecheck
+
+linters-settings:
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+  errcheck:
+    check-type-assertions: true
+  gofumpt:
+    module-path: github.com/foodsea
+
+issues:
+  exclude-dirs:
+    - ent
+    - vendor
+  exclude-rules:
+    - path: "_test\\.go"
+      linters:
+        - errcheck
+        - nilnil
+
+run:
+  timeout: 5m
+  go: "1.22"

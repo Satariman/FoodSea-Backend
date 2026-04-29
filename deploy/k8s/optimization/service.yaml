@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: optimization-service
+  namespace: foodsea
+spec:
+  selector:
+    app: optimization-service
+  ports:
+  - name: http
+    port: 8082
+    targetPort: 8082
+  - name: grpc
+    port: 9092
+    targetPort: 9092
+  type: ClusterIP

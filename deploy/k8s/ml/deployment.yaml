@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-service
+  namespace: foodsea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-service
+  template:
+    metadata:
+      labels:
+        app: ml-service
+    spec:
+      containers:
+      - name: ml
+        image: foodsea/ml-service:latest
+        env:
+        - name: TEXT_WEIGHT
+          value: "0.9"
+        - name: CATEGORY_WEIGHT
+          value: "5.0"
+        - name: NUTRITION_WEIGHT
+          value: "0.5"
+        - name: PRICE_WEIGHT
+          value: "10.0"
+        ports:
+        - containerPort: 50051
+          name: grpc
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi

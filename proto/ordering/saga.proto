@@ -1,0 +1,63 @@
+syntax = "proto3";
+package ordering;
+option go_package = "github.com/foodsea/proto/ordering";
+
+// Saga commands (saga.commands topic payload)
+
+message LockResultCommand {
+    string saga_id = 1;
+    string result_id = 2;
+    string user_id = 3;
+}
+
+message UnlockResultCommand {
+    string saga_id = 1;
+    string result_id = 2;
+}
+
+message ClearCartCommand {
+    string saga_id = 1;
+    string user_id = 2;
+}
+
+message RestoreCartCommand {
+    string saga_id = 1;
+    string user_id = 2;
+    repeated CartItemPayload items = 3;
+}
+
+// Saga replies (saga.replies topic payload)
+
+message ResultLockedReply {
+    string saga_id = 1;
+    bool success = 2;
+    string error = 3;
+}
+
+message ResultUnlockedReply {
+    string saga_id = 1;
+    bool success = 2;
+}
+
+message CartClearedReply {
+    string saga_id = 1;
+    bool success = 2;
+    string error = 3;
+}
+
+message CartRestoredReply {
+    string saga_id = 1;
+    bool success = 2;
+}
+
+message StepFailedReply {
+    string saga_id = 1;
+    int32 step = 2;
+    string reason = 3;
+}
+
+message CartItemPayload {
+    string product_id = 1;
+    string product_name = 2;
+    int32 quantity = 3;
+}

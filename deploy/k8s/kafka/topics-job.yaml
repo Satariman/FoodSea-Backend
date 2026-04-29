@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init-topics
+  namespace: foodsea
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: kafka-init
+        image: confluentinc/cp-kafka:7.5.0
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: kafka:9092
+        command: ["/bin/bash", "/init-topics.sh"]
+        volumeMounts:
+        - name: init-script
+          mountPath: /init-topics.sh
+          subPath: init-topics.sh
+      volumes:
+      - name: init-script
+        configMap:
+          name: kafka-init-topics-script
+          defaultMode: 0755
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-init-topics-script
+  namespace: foodsea
+data:
+  init-topics.sh: |
+    #!/bin/bash
+    set -e
+    BOOTSTRAP="${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}"
+    echo "Creating Kafka topics..."
+    create_topic() {
+      kafka-topics --bootstrap-server "$BOOTSTRAP" \
+        --create --if-not-exists \
+        --topic "$1" --partitions "${2:-3}" --replication-factor "${3:-1}"
+    }
+    create_topic cart.events 3 1
+    create_topic optimization.events 3 1
+    create_topic order.events 3 1
+    create_topic saga.commands 3 1
+    create_topic saga.replies 3 1
+    echo "Topics created"

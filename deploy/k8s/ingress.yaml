@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: foodsea-ingress
+  namespace: foodsea
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/$1$2$3
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api.foodsea.app
+    http:
+      paths:
+      - path: /api/v1/(products|categories|stores|cart|search|barcode|auth|users)(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: core-service
+            port:
+              number: 8081
+      - path: /api/v1/(optimize)(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: optimization-service
+            port:
+              number: 8082
+      - path: /api/v1/(orders)(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: ordering-service
+            port:
+              number: 8083

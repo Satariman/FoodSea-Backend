@@ -1,0 +1,80 @@
+syntax = "proto3";
+package optimization;
+option go_package = "github.com/foodsea/proto/optimization";
+
+service OptimizationService {
+    rpc RunOptimization(RunOptimizationRequest) returns (RunOptimizationResponse);
+    rpc GetResult(GetResultRequest) returns (GetResultResponse);
+    rpc LockResult(LockResultRequest) returns (LockResultResponse);
+    rpc UnlockResult(UnlockResultRequest) returns (UnlockResultResponse);
+}
+
+message RunOptimizationRequest {
+    string user_id = 1;
+}
+
+message RunOptimizationResponse {
+    string result_id = 1;
+}
+
+message GetResultRequest {
+    string result_id = 1;
+}
+
+message GetResultResponse {
+    OptimizationResultProto result = 1;
+}
+
+message LockResultRequest {
+    string result_id = 1;
+}
+
+message LockResultResponse {
+    bool success = 1;
+}
+
+message UnlockResultRequest {
+    string result_id = 1;
+}
+
+message UnlockResultResponse {
+    bool success = 1;
+}
+
+message OptimizationResultProto {
+    string id = 1;
+    string user_id = 2;
+    int64 total_kopecks = 3;
+    int64 delivery_kopecks = 4;
+    int64 savings_kopecks = 5;
+    string status = 6;
+    repeated OptimizationItemProto items = 7;
+    repeated SubstitutionProto substitutions = 8;
+    bool is_approximate = 9;
+}
+
+message OptimizationItemProto {
+    string product_id = 1;
+    string product_name = 2;
+    string store_id = 3;
+    string store_name = 4;
+    int32 quantity = 5;
+    int64 price_kopecks = 6;
+}
+
+message SubstitutionProto {
+    string original_product_id = 1;
+    string original_product_name = 2;
+    string analog_product_id = 3;
+    string analog_product_name = 4;
+    string original_store_id = 5;
+    string new_store_id = 6;
+    string new_store_name = 7;
+    int64 old_price_kopecks = 8;
+    int64 new_price_kopecks = 9;
+    int64 price_delta_kopecks = 10;
+    int64 delivery_delta_kopecks = 11;
+    int64 total_saving_kopecks = 12;
+    double score = 13;
+    bool is_cross_store = 14;
+}
