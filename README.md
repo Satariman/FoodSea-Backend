@@ -143,6 +143,7 @@ Backend-платформа FoodSea для iOS-приложения: катало
 | Kafka (Confluent) | Событийная шина и поддержка Saga-аудита |
 | MinIO (S3-compatible) | Локальный и предсказуемый storage для изображений |
 | Docker Compose | Быстрый локальный запуск зависимостей без k8s-overhead |
+| Kubernetes | Deployment-манифесты, HPA, Ingress и stateful-компоненты для кластерного запуска |
 | Testcontainers | Интеграционные/e2e тесты в условиях, близких к production runtime |
 
 ## 5) Структура репозитория
@@ -260,6 +261,65 @@ make lint
 make seed-core
 make stop-all
 make dev-infra-down
+```
+
+## 10) Запуск в Kubernetes
+
+В репозитории есть готовые манифесты в `deploy/k8s`:
+- namespace `foodsea`,
+- Deployments/Services для `core`, `optimization`, `ordering`, `ml`,
+- StatefulSets для Postgres, Redis, Kafka/Zookeeper,
+- HPA для Go-сервисов,
+- Ingress (`deploy/k8s/ingress.yaml`).
+
+### Требования
+
+- настроенный Kubernetes-контекст (`kubectl config current-context`);
+- доступный Ingress Controller (манифест использует `ingressClassName: nginx`);
+- локальные образы `foodsea/*:latest` должны быть доступны кластеру.
+
+### Деплой
+
+```bash
+make k8s-deploy
+```
+
+Таргет выполняет:
+- `docker build` для всех сервисов;
+- `kubectl apply -f deploy/k8s/namespace.yaml`;
+- `kubectl apply -f deploy/k8s/ -R`.
+
+### Проверка состояния
+
+```bash
+make k8s-status
+kubectl get pods,svc,ingress -n foodsea
+```
+
+Логи конкретного сервиса:
+
+```bash
+make k8s-logs SVC=core-service
+make k8s-logs SVC=optimization-service
+make k8s-logs SVC=ordering-service
+make k8s-logs SVC=ml-service
+```
+
+### Доступ к API
+
+- Через Ingress host: `api.foodsea.app` (смотри правила в `deploy/k8s/ingress.yaml`).
+- Для локальной проверки без DNS можно использовать port-forward:
+
+```bash
+kubectl port-forward -n foodsea svc/core-service 8081:8081
+kubectl port-forward -n foodsea svc/optimization-service 8082:8082
+kubectl port-forward -n foodsea svc/ordering-service 8083:8083
+```
+
+### Удаление
+
+```bash
+make k8s-down
 ```
 
 ---
