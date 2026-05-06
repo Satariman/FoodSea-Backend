@@ -1,0 +1,1169 @@
+basePath: /api/v1
+definitions:
+  github_com_foodsea_core_internal_modules_catalog_handler.BestOfferResponse:
+    properties:
+      discount_percent:
+        type: integer
+      original_price_kopecks:
+        type: integer
+      price_kopecks:
+        type: integer
+      store_name:
+        type: string
+      store_slug:
+        type: string
+    type: object
+  github_com_foodsea_core_internal_modules_catalog_handler.BrandBriefResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  github_com_foodsea_core_internal_modules_catalog_handler.CategoryBriefResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  github_com_foodsea_core_internal_modules_catalog_handler.NutritionResponse:
+    properties:
+      calories:
+        type: number
+      carbohydrates:
+        type: number
+      fat:
+        type: number
+      protein:
+        type: number
+    type: object
+  github_com_foodsea_core_internal_modules_catalog_handler.ProductDetailResponse:
+    properties:
+      barcode:
+        type: string
+      best_offer:
+        $ref: '#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.BestOfferResponse'
+      brand:
+        $ref: '#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.BrandBriefResponse'
+      category:
+        $ref: '#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.CategoryBriefResponse'
+      composition:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      in_stock:
+        type: boolean
+      name:
+        type: string
+      nutrition:
+        $ref: '#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.NutritionResponse'
+      subcategory:
+        $ref: '#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.CategoryBriefResponse'
+      weight:
+        type: string
+    type: object
+  github_com_foodsea_core_internal_platform_httputil.Meta:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total_count:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  github_com_foodsea_core_internal_platform_httputil.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+      meta:
+        $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Meta'
+    type: object
+  internal_modules_cart_handler.AddItemRequest:
+    properties:
+      product_id:
+        type: string
+      quantity:
+        maximum: 99
+        minimum: 1
+        type: integer
+    required:
+    - product_id
+    - quantity
+    type: object
+  internal_modules_cart_handler.CartItemResponse:
+    properties:
+      added_at:
+        type: string
+      product_id:
+        type: string
+      product_name:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  internal_modules_cart_handler.CartResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_cart_handler.CartItemResponse'
+        type: array
+    type: object
+  internal_modules_cart_handler.UpdateItemRequest:
+    properties:
+      quantity:
+        maximum: 99
+        minimum: 1
+        type: integer
+    required:
+    - quantity
+    type: object
+  internal_modules_catalog_handler.BestOfferResponse:
+    properties:
+      discount_percent:
+        type: integer
+      original_price_kopecks:
+        type: integer
+      price_kopecks:
+        type: integer
+      store_name:
+        type: string
+      store_slug:
+        type: string
+    type: object
+  internal_modules_catalog_handler.BrandBriefResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_modules_catalog_handler.BrandResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_modules_catalog_handler.CategoryBriefResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_modules_catalog_handler.CategoryResponse:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/internal_modules_catalog_handler.CategoryResponse'
+        type: array
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+      sort_order:
+        type: integer
+    type: object
+  internal_modules_catalog_handler.NutritionResponse:
+    properties:
+      calories:
+        type: number
+      carbohydrates:
+        type: number
+      fat:
+        type: number
+      protein:
+        type: number
+    type: object
+  internal_modules_catalog_handler.ProductBriefResponse:
+    properties:
+      id:
+        type: string
+      image_url:
+        type: string
+      in_stock:
+        type: boolean
+      max_discount_percent:
+        type: integer
+      min_price_kopecks:
+        type: integer
+      name:
+        type: string
+      weight:
+        type: string
+    type: object
+  internal_modules_catalog_handler.ProductDetailResponse:
+    properties:
+      barcode:
+        type: string
+      best_offer:
+        $ref: '#/definitions/internal_modules_catalog_handler.BestOfferResponse'
+      brand:
+        $ref: '#/definitions/internal_modules_catalog_handler.BrandBriefResponse'
+      category:
+        $ref: '#/definitions/internal_modules_catalog_handler.CategoryBriefResponse'
+      composition:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      in_stock:
+        type: boolean
+      name:
+        type: string
+      nutrition:
+        $ref: '#/definitions/internal_modules_catalog_handler.NutritionResponse'
+      subcategory:
+        $ref: '#/definitions/internal_modules_catalog_handler.CategoryBriefResponse'
+      weight:
+        type: string
+    type: object
+  internal_modules_identity_handler.AuthResponse:
+    properties:
+      access_expires_at:
+        type: string
+      access_token:
+        type: string
+      refresh_expires_at:
+        type: string
+      refresh_token:
+        type: string
+      user:
+        $ref: '#/definitions/internal_modules_identity_handler.UserResponse'
+    type: object
+  internal_modules_identity_handler.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+    required:
+    - password
+    type: object
+  internal_modules_identity_handler.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  internal_modules_identity_handler.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      phone:
+        type: string
+    required:
+    - password
+    type: object
+  internal_modules_identity_handler.TokenPairResponse:
+    properties:
+      access_expires_at:
+        type: string
+      access_token:
+        type: string
+      refresh_expires_at:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  internal_modules_identity_handler.UserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      onboarding_done:
+        type: boolean
+      phone:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  internal_modules_images_interfaces.imageURLResponse:
+    properties:
+      image_url:
+        type: string
+    type: object
+  internal_modules_partners_handler.OfferResponse:
+    properties:
+      discount_percent:
+        type: integer
+      in_stock:
+        type: boolean
+      original_price_kopecks:
+        type: integer
+      price_kopecks:
+        type: integer
+      store:
+        $ref: '#/definitions/internal_modules_partners_handler.StoreBriefResponse'
+    type: object
+  internal_modules_partners_handler.StoreBriefResponse:
+    properties:
+      id:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_modules_partners_handler.StoreResponse:
+    properties:
+      id:
+        type: string
+      is_active:
+        type: boolean
+      logo_url:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+    type: object
+  internal_modules_search_handler.SearchResultItemResponse:
+    properties:
+      barcode:
+        type: string
+      brand_id:
+        type: string
+      category_id:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      in_stock:
+        type: boolean
+      max_discount_percent:
+        type: integer
+      min_price_kopecks:
+        type: integer
+      name:
+        type: string
+      offers_count:
+        type: integer
+      score:
+        type: number
+      subcategory_id:
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Core service API — каталог, корзина, поиск, пользователи, магазины.
+  title: FoodSea Core API
+  version: "1.0"
+paths:
+  /admin/products/{id}/image:
+    delete:
+      description: Removes the image associated with the product
+      parameters:
+      - description: Product UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Delete product image
+      tags:
+      - Admin
+    post:
+      consumes:
+      - multipart/form-data
+      description: 'Uploads an image for the product (multipart/form-data, field "image").
+        Max 5 MB. Allowed: image/jpeg, image/png, image/webp.'
+      parameters:
+      - description: Product UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Image file
+        in: formData
+        name: image
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_images_interfaces.imageURLResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Upload product image
+      tags:
+      - Admin
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns JWT tokens
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Login
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Revokes all refresh tokens for the current user
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Logout
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges a valid refresh token for a new token pair
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_handler.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.TokenPairResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Refresh tokens
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account with phone or email and returns JWT
+        tokens
+      parameters:
+      - description: Registration credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_handler.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Register a new user
+      tags:
+      - auth
+  /barcode/{code}:
+    get:
+      description: Возвращает карточку товара по его штрихкоду (EAN-8 или EAN-13)
+      parameters:
+      - description: Штрихкод (8 или 13 цифр)
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.ProductDetailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                error:
+                  type: string
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                error:
+                  type: string
+              type: object
+      summary: Получить товар по штрихкоду
+      tags:
+      - Barcode
+  /brands:
+    get:
+      description: Returns all brands for use on the filter screen
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_catalog_handler.BrandResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: List brands
+      tags:
+      - Brands
+  /cart:
+    delete:
+      description: Removes all items from the authenticated user's cart
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Clear cart
+      tags:
+      - Cart
+    get:
+      description: Returns the authenticated user's cart with all items
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart_handler.CartResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Get current cart
+      tags:
+      - Cart
+  /cart/items:
+    post:
+      consumes:
+      - application/json
+      description: Adds a product to the cart; increments quantity if already present
+      parameters:
+      - description: Add item request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_cart_handler.AddItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart_handler.CartResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Add item to cart
+      tags:
+      - Cart
+  /cart/items/{product_id}:
+    delete:
+      description: Removes a product from the cart (idempotent)
+      parameters:
+      - description: Product UUID
+        in: path
+        name: product_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Remove item from cart
+      tags:
+      - Cart
+    put:
+      consumes:
+      - application/json
+      description: Sets a new quantity for the given product in the cart
+      parameters:
+      - description: Product UUID
+        in: path
+        name: product_id
+        required: true
+        type: string
+      - description: Update quantity
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_cart_handler.UpdateItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_cart_handler.CartResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Update item quantity
+      tags:
+      - Cart
+  /categories:
+    get:
+      description: Returns the full two-level category tree
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_catalog_handler.CategoryResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: List categories
+      tags:
+      - Categories
+  /products:
+    get:
+      description: Returns a paginated list of products with optional filters
+      parameters:
+      - description: Category UUID
+        in: query
+        name: category_id
+        type: string
+      - description: Subcategory UUID
+        in: query
+        name: subcategory_id
+        type: string
+      - description: Brand UUID
+        in: query
+        name: brand_id
+        type: string
+      - description: Only in-stock products
+        in: query
+        name: in_stock
+        type: boolean
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 20, max 100)
+        in: query
+        name: page_size
+        type: integer
+      - description: 'Sort: name_asc | name_desc | created_desc'
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_catalog_handler.ProductBriefResponse'
+                  type: array
+                meta:
+                  $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Meta'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: List products
+      tags:
+      - Products
+  /products/{id}:
+    get:
+      description: Returns the full product card including KBJU and related entities
+      parameters:
+      - description: Product UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_catalog_handler.ProductDetailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Get product by ID
+      tags:
+      - Products
+  /products/{id}/offers:
+    get:
+      description: Returns all partner store offers for a given product, sorted by
+        price (UC-07 compare prices)
+      parameters:
+      - description: Product UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Return only offers with a discount
+        in: query
+        name: has_discount
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_partners_handler.OfferResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Get offers for a product
+      tags:
+      - Partners
+  /products/barcode/{code}:
+    get:
+      description: Looks up a product by EAN-8 or EAN-13 barcode
+      parameters:
+      - description: EAN-8 or EAN-13 barcode
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_catalog_handler.ProductDetailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Get product by barcode
+      tags:
+      - Products
+  /search:
+    get:
+      description: Full-text search over products with filters, sorting, and pagination
+      parameters:
+      - description: Search query (min 2 chars)
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Category UUID
+        in: query
+        name: category_id
+        type: string
+      - description: Subcategory UUID
+        in: query
+        name: subcategory_id
+        type: string
+      - description: Brand UUID
+        in: query
+        name: brand_id
+        type: string
+      - description: Store UUID — limits min_price and offers_count to this store
+        in: query
+        name: store_id
+        type: string
+      - description: Minimum price in kopecks
+        in: query
+        name: min_price
+        type: integer
+      - description: Maximum price in kopecks
+        in: query
+        name: max_price
+        type: integer
+      - description: Only in-stock products
+        in: query
+        name: in_stock
+        type: boolean
+      - description: Only products with at least one discounted offer
+        in: query
+        name: has_discount
+        type: boolean
+      - description: 'Sort: relevance | price_asc | price_desc | name_asc | name_desc
+          | discount_desc'
+        in: query
+        name: sort
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 20, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_search_handler.SearchResultItemResponse'
+                  type: array
+                meta:
+                  $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Meta'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Search products
+      tags:
+      - Search
+  /stores:
+    get:
+      description: Returns all active partner stores sorted by name
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_partners_handler.StoreResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: List partner stores
+      tags:
+      - Partners
+  /users/me:
+    get:
+      description: Returns the authenticated user's profile
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.UserResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Get current user profile
+      tags:
+      - users
+  /users/me/onboarding:
+    post:
+      description: Marks the onboarding as done for the current user (idempotent)
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Complete onboarding
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT токен. Формат: "Bearer {token}"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

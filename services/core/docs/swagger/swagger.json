@@ -1,0 +1,1871 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Core service API — каталог, корзина, поиск, пользователи, магазины.",
+        "title": "FoodSea Core API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8081",
+    "basePath": "/api/v1",
+    "paths": {
+        "/admin/products/{id}/image": {
+            "post": {
+                "description": "Uploads an image for the product (multipart/form-data, field \"image\"). Max 5 MB. Allowed: image/jpeg, image/png, image/webp.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Upload product image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Image file",
+                        "name": "image",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_images_interfaces.imageURLResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Removes the image associated with the product",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete product image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "Authenticates a user and returns JWT tokens",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_identity_handler.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_identity_handler.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Revokes all refresh tokens for the current user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "description": "Exchanges a valid refresh token for a new token pair",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh tokens",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_identity_handler.RefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_identity_handler.TokenPairResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Creates a new user account with phone or email and returns JWT tokens",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "Registration credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_identity_handler.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_identity_handler.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/barcode/{code}": {
+            "get": {
+                "description": "Возвращает карточку товара по его штрихкоду (EAN-8 или EAN-13)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Barcode"
+                ],
+                "summary": "Получить товар по штрихкоду",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Штрихкод (8 или 13 цифр)",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.ProductDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/brands": {
+            "get": {
+                "description": "Returns all brands for use on the filter screen",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Brands"
+                ],
+                "summary": "List brands",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_catalog_handler.BrandResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/cart": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the authenticated user's cart with all items",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Get current cart",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_cart_handler.CartResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes all items from the authenticated user's cart",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Clear cart",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/cart/items": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds a product to the cart; increments quantity if already present",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Add item to cart",
+                "parameters": [
+                    {
+                        "description": "Add item request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_cart_handler.AddItemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_cart_handler.CartResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/cart/items/{product_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets a new quantity for the given product in the cart",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Update item quantity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product UUID",
+                        "name": "product_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update quantity",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_cart_handler.UpdateItemRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_cart_handler.CartResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a product from the cart (idempotent)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cart"
+                ],
+                "summary": "Remove item from cart",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product UUID",
+                        "name": "product_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories": {
+            "get": {
+                "description": "Returns the full two-level category tree",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "List categories",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_catalog_handler.CategoryResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/products": {
+            "get": {
+                "description": "Returns a paginated list of products with optional filters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "List products",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category UUID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Subcategory UUID",
+                        "name": "subcategory_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand UUID",
+                        "name": "brand_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only in-stock products",
+                        "name": "in_stock",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort: name_asc | name_desc | created_desc",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_catalog_handler.ProductBriefResponse"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Meta"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/products/barcode/{code}": {
+            "get": {
+                "description": "Looks up a product by EAN-8 or EAN-13 barcode",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get product by barcode",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "EAN-8 or EAN-13 barcode",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_catalog_handler.ProductDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/products/{id}": {
+            "get": {
+                "description": "Returns the full product card including KBJU and related entities",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get product by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_catalog_handler.ProductDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/products/{id}/offers": {
+            "get": {
+                "description": "Returns all partner store offers for a given product, sorted by price (UC-07 compare prices)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Partners"
+                ],
+                "summary": "Get offers for a product",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Return only offers with a discount",
+                        "name": "has_discount",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_partners_handler.OfferResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/search": {
+            "get": {
+                "description": "Full-text search over products with filters, sorting, and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Search"
+                ],
+                "summary": "Search products",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query (min 2 chars)",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Category UUID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Subcategory UUID",
+                        "name": "subcategory_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Brand UUID",
+                        "name": "brand_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Store UUID — limits min_price and offers_count to this store",
+                        "name": "store_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum price in kopecks",
+                        "name": "min_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum price in kopecks",
+                        "name": "max_price",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only in-stock products",
+                        "name": "in_stock",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only products with at least one discounted offer",
+                        "name": "has_discount",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort: relevance | price_asc | price_desc | name_asc | name_desc | discount_desc",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 20, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_search_handler.SearchResultItemResponse"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Meta"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/stores": {
+            "get": {
+                "description": "Returns all active partner stores sorted by name",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Partners"
+                ],
+                "summary": "List partner stores",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/internal_modules_partners_handler.StoreResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the authenticated user's profile",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get current user profile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_identity_handler.UserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/onboarding": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks the onboarding as done for the current user (idempotent)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Complete onboarding",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_foodsea_core_internal_modules_catalog_handler.BestOfferResponse": {
+            "type": "object",
+            "properties": {
+                "discount_percent": {
+                    "type": "integer"
+                },
+                "original_price_kopecks": {
+                    "type": "integer"
+                },
+                "price_kopecks": {
+                    "type": "integer"
+                },
+                "store_name": {
+                    "type": "string"
+                },
+                "store_slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_foodsea_core_internal_modules_catalog_handler.BrandBriefResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_foodsea_core_internal_modules_catalog_handler.CategoryBriefResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_foodsea_core_internal_modules_catalog_handler.NutritionResponse": {
+            "type": "object",
+            "properties": {
+                "calories": {
+                    "type": "number"
+                },
+                "carbohydrates": {
+                    "type": "number"
+                },
+                "fat": {
+                    "type": "number"
+                },
+                "protein": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_foodsea_core_internal_modules_catalog_handler.ProductDetailResponse": {
+            "type": "object",
+            "properties": {
+                "barcode": {
+                    "type": "string"
+                },
+                "best_offer": {
+                    "$ref": "#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.BestOfferResponse"
+                },
+                "brand": {
+                    "$ref": "#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.BrandBriefResponse"
+                },
+                "category": {
+                    "$ref": "#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.CategoryBriefResponse"
+                },
+                "composition": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "in_stock": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nutrition": {
+                    "$ref": "#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.NutritionResponse"
+                },
+                "subcategory": {
+                    "$ref": "#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.CategoryBriefResponse"
+                },
+                "weight": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_foodsea_core_internal_platform_httputil.Meta": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total_count": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_foodsea_core_internal_platform_httputil.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "type": "string"
+                },
+                "meta": {
+                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Meta"
+                }
+            }
+        },
+        "internal_modules_cart_handler.AddItemRequest": {
+            "type": "object",
+            "required": [
+                "product_id",
+                "quantity"
+            ],
+            "properties": {
+                "product_id": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "maximum": 99,
+                    "minimum": 1
+                }
+            }
+        },
+        "internal_modules_cart_handler.CartItemResponse": {
+            "type": "object",
+            "properties": {
+                "added_at": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "string"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_modules_cart_handler.CartResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_modules_cart_handler.CartItemResponse"
+                    }
+                }
+            }
+        },
+        "internal_modules_cart_handler.UpdateItemRequest": {
+            "type": "object",
+            "required": [
+                "quantity"
+            ],
+            "properties": {
+                "quantity": {
+                    "type": "integer",
+                    "maximum": 99,
+                    "minimum": 1
+                }
+            }
+        },
+        "internal_modules_catalog_handler.BestOfferResponse": {
+            "type": "object",
+            "properties": {
+                "discount_percent": {
+                    "type": "integer"
+                },
+                "original_price_kopecks": {
+                    "type": "integer"
+                },
+                "price_kopecks": {
+                    "type": "integer"
+                },
+                "store_name": {
+                    "type": "string"
+                },
+                "store_slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_catalog_handler.BrandBriefResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_catalog_handler.BrandResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_catalog_handler.CategoryBriefResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_catalog_handler.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_modules_catalog_handler.CategoryResponse"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_modules_catalog_handler.NutritionResponse": {
+            "type": "object",
+            "properties": {
+                "calories": {
+                    "type": "number"
+                },
+                "carbohydrates": {
+                    "type": "number"
+                },
+                "fat": {
+                    "type": "number"
+                },
+                "protein": {
+                    "type": "number"
+                }
+            }
+        },
+        "internal_modules_catalog_handler.ProductBriefResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "in_stock": {
+                    "type": "boolean"
+                },
+                "max_discount_percent": {
+                    "type": "integer"
+                },
+                "min_price_kopecks": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "weight": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_catalog_handler.ProductDetailResponse": {
+            "type": "object",
+            "properties": {
+                "barcode": {
+                    "type": "string"
+                },
+                "best_offer": {
+                    "$ref": "#/definitions/internal_modules_catalog_handler.BestOfferResponse"
+                },
+                "brand": {
+                    "$ref": "#/definitions/internal_modules_catalog_handler.BrandBriefResponse"
+                },
+                "category": {
+                    "$ref": "#/definitions/internal_modules_catalog_handler.CategoryBriefResponse"
+                },
+                "composition": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "in_stock": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nutrition": {
+                    "$ref": "#/definitions/internal_modules_catalog_handler.NutritionResponse"
+                },
+                "subcategory": {
+                    "$ref": "#/definitions/internal_modules_catalog_handler.CategoryBriefResponse"
+                },
+                "weight": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_handler.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_expires_at": {
+                    "type": "string"
+                },
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_expires_at": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/internal_modules_identity_handler.UserResponse"
+                }
+            }
+        },
+        "internal_modules_identity_handler.LoginRequest": {
+            "type": "object",
+            "required": [
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_handler.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_handler.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_handler.TokenPairResponse": {
+            "type": "object",
+            "properties": {
+                "access_expires_at": {
+                    "type": "string"
+                },
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_expires_at": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_handler.UserResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "onboarding_done": {
+                    "type": "boolean"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_images_interfaces.imageURLResponse": {
+            "type": "object",
+            "properties": {
+                "image_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_partners_handler.OfferResponse": {
+            "type": "object",
+            "properties": {
+                "discount_percent": {
+                    "type": "integer"
+                },
+                "in_stock": {
+                    "type": "boolean"
+                },
+                "original_price_kopecks": {
+                    "type": "integer"
+                },
+                "price_kopecks": {
+                    "type": "integer"
+                },
+                "store": {
+                    "$ref": "#/definitions/internal_modules_partners_handler.StoreBriefResponse"
+                }
+            }
+        },
+        "internal_modules_partners_handler.StoreBriefResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_partners_handler.StoreResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_search_handler.SearchResultItemResponse": {
+            "type": "object",
+            "properties": {
+                "barcode": {
+                    "type": "string"
+                },
+                "brand_id": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "in_stock": {
+                    "type": "boolean"
+                },
+                "max_discount_percent": {
+                    "type": "integer"
+                },
+                "min_price_kopecks": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "offers_count": {
+                    "type": "integer"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "subcategory_id": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "JWT токен. Формат: \"Bearer {token}\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

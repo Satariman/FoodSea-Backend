@@ -36,18 +36,6 @@ go.work.sum
 dist/
 build/
 
-# Ent generated code (keep schema/, generate.go, entc.go)
-services/*/ent/*.go
-services/*/ent/predicate/
-services/*/ent/runtime/
-services/*/ent/migrate/
-services/*/ent/hook/
-services/*/ent/privacy/
-services/*/ent/enttest/
-
-# Swagger (generated)
-services/*/docs/swagger/
-
 # OS
 .DS_Store
 Thumbs.db
