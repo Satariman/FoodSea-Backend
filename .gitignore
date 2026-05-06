@@ -59,7 +59,7 @@ Thumbs.db
 node_modules/
 
 # Atlas
-*.sum
+**/atlas.sum
 
 # ML index artifacts
 services/ml/data/*.pkl
