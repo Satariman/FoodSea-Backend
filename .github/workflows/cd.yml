@@ -131,6 +131,7 @@ jobs:
             if [ ! -d "${REPO_DIR}/.git" ]; then
               git clone "${REPO_URL}" "${REPO_DIR}"
             fi
+            rm -f "${REPO_DIR}/.git/index.lock"
             cd "${REPO_DIR}"
             git remote set-url origin "${REPO_URL}"
             git fetch origin "${{ github.sha }}"
