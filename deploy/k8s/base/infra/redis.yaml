@@ -34,11 +34,11 @@ spec:
             periodSeconds: 10
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 25m
+              memory: 32Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 150m
+              memory: 128Mi
   volumeClaimTemplates:
     - metadata:
         name: redis-data

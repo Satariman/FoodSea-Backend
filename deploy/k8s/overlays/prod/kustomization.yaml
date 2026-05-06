@@ -9,6 +9,7 @@ resources:
 
 patches:
   - path: patch-config.yaml
+  - path: patch-prod-scale.yaml
   - target:
       kind: Ingress
       name: foodsea-api
