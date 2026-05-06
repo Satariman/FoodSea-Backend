@@ -121,7 +121,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            REPO_DIR="/opt/foodsea/backend"
+            REPO_DIR="/opt/foodsea/backend-${{ needs.build.outputs.target_env }}"
             REPO_URL="https://github.com/${{ github.repository }}.git"
             REPO_READ_TOKEN="${{ secrets.REPO_READ_TOKEN }}"
             if [ -n "${REPO_READ_TOKEN}" ]; then
