@@ -6,6 +6,7 @@ require (
 	entgo.io/ent v0.14.6
 	github.com/docker/docker v28.0.1+incompatible
 	github.com/docker/go-connections v0.6.0
+	github.com/foodsea/proto v0.0.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/golang-jwt/jwt/v5 v5.3.1

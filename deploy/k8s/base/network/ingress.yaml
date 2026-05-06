@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: foodsea-api
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/$1$2$3
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: foodsea.local
+      http:
+        paths:
+          - path: /api/v1/(auth|users|products|categories|brands|stores|cart|search|barcode|admin)(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: core-service
+                port:
+                  number: 8081
+          - path: /api/v1/(optimize|analogs)(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: optimization-service
+                port:
+                  number: 8082
+          - path: /api/v1/(orders)(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ordering-service
+                port:
+                  number: 8083
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: foodsea-minio-public
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /product-images/$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: foodsea.local
+      http:
+        paths:
+          - path: /product-images(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9000

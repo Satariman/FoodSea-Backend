@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: core-config
+data:
+  ENV: development
+  S3_PUBLIC_BASE_URL: http://dev.foodsea.example.com/product-images
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: optimization-config
+data:
+  ENV: development
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ordering-config
+data:
+  ENV: development

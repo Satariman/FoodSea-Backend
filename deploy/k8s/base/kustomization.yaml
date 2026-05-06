@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - infra/postgres.yaml
+  - infra/redis.yaml
+  - infra/kafka.yaml
+  - infra/minio.yaml
+  - apps/core.yaml
+  - apps/optimization.yaml
+  - apps/ordering.yaml
+  - apps/ml.yaml
+  - migrations/jobs.yaml
+  - network/ingress.yaml
+  - security/network-policies.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: core-migrations
+    files:
+      - migrations/sql/core/20260424102431_initial.sql
+      - migrations/sql/core/20260424102440_fulltext_index.sql
+      - migrations/sql/core/atlas.sum
+  - name: optimization-migrations
+    files:
+      - migrations/sql/optimization/20260428223651_initial.sql
+      - migrations/sql/optimization/atlas.sum
+  - name: ordering-migrations
+    files:
+      - migrations/sql/ordering/20260425120145_initial.sql
+      - migrations/sql/ordering/atlas.sum

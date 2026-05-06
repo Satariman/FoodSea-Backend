@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ordering-config
+data:
+  ENV: production
+  SERVER_PORT: "8083"
+  GRPC_PORT: "9093"
+  REDIS_URL: redis://redis:6379/2
+  KAFKA_BROKERS: kafka:9092
+  CORE_GRPC_ADDR: core-service:9091
+  OPTIMIZATION_GRPC_ADDR: optimization-service:9092
+  SAGA_STEP_TIMEOUT: 30s
+  SAGA_MAX_COMPENSATION_ATTEMPTS: "5"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ordering-service
+  labels:
+    app.kubernetes.io/name: ordering-service
+    app.kubernetes.io/component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ordering-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ordering-service
+        app.kubernetes.io/component: api
+    spec:
+      imagePullSecrets:
+        - name: registry-credentials
+      containers:
+        - name: ordering
+          image: ordering-service:latest
+          ports:
+            - containerPort: 8083
+              name: http
+            - containerPort: 9093
+              name: grpc
+          envFrom:
+            - configMapRef:
+                name: ordering-config
+            - secretRef:
+                name: ordering-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ordering-service
+  labels:
+    app.kubernetes.io/name: ordering-service
+spec:
+  selector:
+    app.kubernetes.io/name: ordering-service
+  ports:
+    - name: http
+      port: 8083
+      targetPort: 8083
+    - name: grpc
+      port: 9093
+      targetPort: 9093
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ordering-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ordering-service
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

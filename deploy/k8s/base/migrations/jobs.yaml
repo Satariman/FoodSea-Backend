@@ -1,0 +1,86 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate-core
+  labels:
+    app.kubernetes.io/name: migrate-core
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 8
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: atlas
+          image: arigaio/atlas:latest
+          command: ["sh", "-ec"]
+          args:
+            - atlas migrate apply --dir file:///migrations --url "$DB_URL"
+          envFrom:
+            - secretRef:
+                name: core-secrets
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+      volumes:
+        - name: migrations
+          configMap:
+            name: core-migrations
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate-optimization
+  labels:
+    app.kubernetes.io/name: migrate-optimization
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 8
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: atlas
+          image: arigaio/atlas:latest
+          command: ["sh", "-ec"]
+          args:
+            - atlas migrate apply --dir file:///migrations --url "$DB_URL"
+          envFrom:
+            - secretRef:
+                name: optimization-secrets
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+      volumes:
+        - name: migrations
+          configMap:
+            name: optimization-migrations
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate-ordering
+  labels:
+    app.kubernetes.io/name: migrate-ordering
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 8
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: atlas
+          image: arigaio/atlas:latest
+          command: ["sh", "-ec"]
+          args:
+            - atlas migrate apply --dir file:///migrations --url "$DB_URL"
+          envFrom:
+            - secretRef:
+                name: ordering-secrets
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+      volumes:
+        - name: migrations
+          configMap:
+            name: ordering-migrations

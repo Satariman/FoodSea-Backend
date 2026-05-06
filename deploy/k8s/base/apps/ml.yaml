@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-service
+  labels:
+    app.kubernetes.io/name: ml-service
+    app.kubernetes.io/component: grpc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ml-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ml-service
+        app.kubernetes.io/component: grpc
+    spec:
+      imagePullSecrets:
+        - name: registry-credentials
+      containers:
+        - name: ml
+          image: ml-service:latest
+          env:
+            - name: GRPC_PORT
+              value: "50051"
+            - name: TEXT_WEIGHT
+              value: "0.9"
+            - name: CATEGORY_WEIGHT
+              value: "5.0"
+            - name: NUTRITION_WEIGHT
+              value: "0.5"
+            - name: PRICE_WEIGHT
+              value: "10.0"
+          ports:
+            - containerPort: 50051
+              name: grpc
+          resources:
+            requests:
+              cpu: 300m
+              memory: 512Mi
+            limits:
+              cpu: 1500m
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-service
+  labels:
+    app.kubernetes.io/name: ml-service
+spec:
+  selector:
+    app.kubernetes.io/name: ml-service
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: 50051
+  type: ClusterIP

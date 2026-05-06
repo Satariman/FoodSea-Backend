@@ -1,0 +1,146 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image_registry: ${{ steps.meta.outputs.image_registry }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      target_env: ${{ steps.meta.outputs.target_env }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve deployment metadata
+        id: meta
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            target_env="${{ inputs.environment }}"
+          elif [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            target_env="prod"
+          else
+            target_env="dev"
+          fi
+          echo "image_registry=ghcr.io/${owner}/foodsea-backend" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "target_env=${target_env}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push core
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/core/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_registry }}/core-service:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.image_registry }}/core-service:${{ steps.meta.outputs.target_env }}
+
+      - name: Build and push optimization
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/optimization/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_registry }}/optimization-service:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.image_registry }}/optimization-service:${{ steps.meta.outputs.target_env }}
+
+      - name: Build and push ordering
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/ordering/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_registry }}/ordering-service:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.image_registry }}/ordering-service:${{ steps.meta.outputs.target_env }}
+
+      - name: Build and push ml
+        uses: docker/build-push-action@v6
+        with:
+          context: services/ml
+          file: services/ml/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_registry }}/ml-service:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.image_registry }}/ml-service:${{ steps.meta.outputs.target_env }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: ${{ needs.build.outputs.target_env }}
+    steps:
+      - name: Resolve host
+        id: host
+        shell: bash
+        run: |
+          if [[ "${{ needs.build.outputs.target_env }}" == "prod" ]]; then
+            echo "foodsea_host=${{ secrets.PROD_HOST }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "foodsea_host=${{ secrets.DEV_HOST }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            REPO_DIR="/opt/foodsea/backend"
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+            REPO_READ_TOKEN="${{ secrets.REPO_READ_TOKEN }}"
+            if [ -n "${REPO_READ_TOKEN}" ]; then
+              REPO_URL="https://x-access-token:${REPO_READ_TOKEN}@github.com/${{ github.repository }}.git"
+            fi
+            sudo install -d -o "$USER" -g "$USER" "${REPO_DIR}"
+            if [ ! -d "${REPO_DIR}/.git" ]; then
+              git clone "${REPO_URL}" "${REPO_DIR}"
+            fi
+            cd "${REPO_DIR}"
+            git remote set-url origin "${REPO_URL}"
+            git fetch origin "${{ github.sha }}"
+            git checkout --force "${{ github.sha }}"
+            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            export FOODSEA_ENV="${{ needs.build.outputs.target_env }}"
+            export FOODSEA_HOST="${{ steps.host.outputs.foodsea_host }}"
+            export IMAGE_REGISTRY="${{ needs.build.outputs.image_registry }}"
+            export IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+            export REGISTRY_SERVER="ghcr.io"
+            export REGISTRY_USERNAME="${{ github.actor }}"
+            export REGISTRY_PASSWORD="${{ secrets.GHCR_READ_TOKEN }}"
+            deploy/scripts/deploy-k8s.sh

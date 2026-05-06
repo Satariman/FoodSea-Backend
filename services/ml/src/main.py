@@ -39,13 +39,18 @@ def build_index(config: Config) -> AnalogIndex:
         return index
 
     logger.info("building feature vectors using model %s", config.TEXT_MODEL)
-    builder = FeatureBuilder(
-        text_model_name=config.TEXT_MODEL,
-        text_weight=config.TEXT_WEIGHT,
-        category_weight=config.CATEGORY_WEIGHT,
-        nutrition_weight=config.NUTRITION_WEIGHT,
-        price_weight=config.PRICE_WEIGHT,
-    )
+    try:
+        builder = FeatureBuilder(
+            text_model_name=config.TEXT_MODEL,
+            text_weight=config.TEXT_WEIGHT,
+            category_weight=config.CATEGORY_WEIGHT,
+            nutrition_weight=config.NUTRITION_WEIGHT,
+            price_weight=config.PRICE_WEIGHT,
+        )
+    except ImportError as exc:
+        logger.warning("text embedding dependency is unavailable, starting with empty index: %s", exc)
+        return index
+
     vectors = builder.build(products)
 
     product_ids = [p.product_id for p in products]

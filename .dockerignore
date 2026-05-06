@@ -1,14 +1,12 @@
 bin/
 vendor/
-*.md
 .git/
 .gitignore
 .idea/
 prompts/
-deploy/
-docs/
-services/*/docs/
-services/*/migrations/
 coverage.*
 *.log
 .DS_Store
+services/ml/.venv/
+**/__pycache__/
+**/*.pyc
