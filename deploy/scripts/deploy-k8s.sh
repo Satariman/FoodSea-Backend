@@ -93,7 +93,9 @@ else
     --dry-run=client -o yaml | kubectl apply -f -
 fi
 
-kubectl -n "${NS}" delete job -l app.kubernetes.io/component=migration --ignore-not-found
+for job_name in migrate-core migrate-optimization migrate-ordering kafka-init-topics; do
+  kubectl -n "${NS}" delete job "${job_name}" --ignore-not-found --wait=true
+done
 
 kubectl kustomize "${OVERLAY}" > "${TMP_MANIFEST}"
 sed -i.bak \
