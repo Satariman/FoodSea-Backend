@@ -13,9 +13,7 @@ spec:
       containers:
         - name: atlas
           image: arigaio/atlas:latest
-          command: ["sh", "-ec"]
-          args:
-            - atlas migrate apply --dir file:///migrations --url "$DB_URL"
+          command: ["atlas", "migrate", "apply", "--dir", "file:///migrations", "--url", "$(DB_URL)"]
           envFrom:
             - secretRef:
                 name: core-secrets
@@ -42,9 +40,7 @@ spec:
       containers:
         - name: atlas
           image: arigaio/atlas:latest
-          command: ["sh", "-ec"]
-          args:
-            - atlas migrate apply --dir file:///migrations --url "$DB_URL"
+          command: ["atlas", "migrate", "apply", "--dir", "file:///migrations", "--url", "$(DB_URL)"]
           envFrom:
             - secretRef:
                 name: optimization-secrets
@@ -71,9 +67,7 @@ spec:
       containers:
         - name: atlas
           image: arigaio/atlas:latest
-          command: ["sh", "-ec"]
-          args:
-            - atlas migrate apply --dir file:///migrations --url "$DB_URL"
+          command: ["atlas", "migrate", "apply", "--dir", "file:///migrations", "--url", "$(DB_URL)"]
           envFrom:
             - secretRef:
                 name: ordering-secrets
