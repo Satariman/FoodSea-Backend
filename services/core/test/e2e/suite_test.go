@@ -5,6 +5,7 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 	"net/netip"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,10 +48,16 @@ var (
 	testBaseURL     string
 	testGRPCAddr    string
 	testKafkaBroker string
+	testOAuthServer *httptest.Server
 
 	seededProductID      string
 	seededProductBarcode = "4607025390015"
 	seededStoreID        string
+)
+
+const (
+	testGoogleRedirectURI = "foodsea://oauth/google/callback"
+	testYandexRedirectURI = "foodsea://oauth/yandex/callback"
 )
 
 func TestMain(m *testing.M) {
@@ -172,6 +180,10 @@ func run(ctx context.Context, m *testing.M) int {
 	cartProducer := kafka.NewProducer([]string{testKafkaBroker}, "cart.events", log)
 	defer cartProducer.Close()
 
+	// ── OAuth fake provider ───────────────────────────────────────────────────
+	testOAuthServer = newOAuthFakeServer()
+	defer testOAuthServer.Close()
+
 	// Apply schema (tests only; production uses Atlas migrations).
 	if err := entClient.Schema.Create(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "create schema: %v\n", err)
@@ -185,6 +197,26 @@ func run(ctx context.Context, m *testing.M) int {
 		Cache: redisCache,
 		Log:   log,
 		JWT:   jwtCfg,
+		OAuth: config.OAuthConfig{
+			StateTTL:            10 * time.Minute,
+			AllowedRedirectURIs: []string{testGoogleRedirectURI, testYandexRedirectURI},
+			Google: config.OAuthProviderConfig{
+				Enabled:      true,
+				ClientID:     "google-client",
+				ClientSecret: "google-secret",
+				AuthURL:      testOAuthServer.URL + "/google/auth",
+				TokenURL:     testOAuthServer.URL + "/google/token",
+				UserInfoURL:  testOAuthServer.URL + "/google/userinfo",
+			},
+			Yandex: config.OAuthProviderConfig{
+				Enabled:      true,
+				ClientID:     "yandex-client",
+				ClientSecret: "yandex-secret",
+				AuthURL:      testOAuthServer.URL + "/yandex/auth",
+				TokenURL:     testOAuthServer.URL + "/yandex/token",
+				UserInfoURL:  testOAuthServer.URL + "/yandex/info",
+			},
+		},
 	})
 	catalogMod := catalog.NewModule(catalog.Deps{
 		Ent:   entClient,
@@ -421,4 +453,94 @@ func deleteAuth(url, token string) (*http.Response, error) {
 func decodeJSON(resp *http.Response, dst any) error {
 	defer resp.Body.Close()
 	return json.NewDecoder(resp.Body).Decode(dst)
+}
+
+func newOAuthFakeServer() *httptest.Server {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/google/token", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		code := r.FormValue("code")
+		var (
+			email *string
+			sub   string
+			nonce string
+		)
+		switch {
+		case strings.HasPrefix(code, "google-new:"):
+			nonce = strings.TrimPrefix(code, "google-new:")
+			sub = "google-sub-new"
+			v := "google-new@foodsea.test"
+			email = &v
+		case strings.HasPrefix(code, "google-link:"):
+			nonce = strings.TrimPrefix(code, "google-link:")
+			sub = "google-sub-link"
+			v := "linked-oauth@foodsea.test"
+			email = &v
+		default:
+			http.Error(w, "unknown code", http.StatusUnauthorized)
+			return
+		}
+		claims := map[string]any{
+			"iss":            "https://accounts.google.com",
+			"aud":            "google-client",
+			"exp":            time.Now().Add(15 * time.Minute).Unix(),
+			"nonce":          nonce,
+			"sub":            sub,
+			"email":          email,
+			"email_verified": true,
+		}
+		payload := map[string]any{
+			"access_token": "google-access-" + sub,
+			"id_token":     fakeUnsignedJWT(claims),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(payload)
+	})
+
+	mux.HandleFunc("/google/certs", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"keys":[]}`))
+	})
+
+	mux.HandleFunc("/yandex/token", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		code := r.FormValue("code")
+		switch code {
+		case "yandex-code-new-user":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "ya-token-new"})
+		default:
+			http.Error(w, "unknown code", http.StatusUnauthorized)
+		}
+	})
+
+	mux.HandleFunc("/yandex/info", func(w http.ResponseWriter, r *http.Request) {
+		auth := strings.TrimSpace(r.Header.Get("Authorization"))
+		switch auth {
+		case "OAuth ya-token-new":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":            "yandex-id-new",
+				"default_email": "yandex-new@foodsea.test",
+			})
+		default:
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		}
+	})
+
+	return httptest.NewServer(mux)
+}
+
+func fakeUnsignedJWT(claims map[string]any) string {
+	header := map[string]any{"alg": "none", "typ": "JWT"}
+	headerJSON, _ := json.Marshal(header)
+	claimsJSON, _ := json.Marshal(claims)
+	return base64.RawURLEncoding.EncodeToString(headerJSON) + "." + base64.RawURLEncoding.EncodeToString(claimsJSON) + "."
 }
