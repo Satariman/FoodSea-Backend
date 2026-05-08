@@ -17,6 +17,7 @@ const (
 	OAuthProviderGoogle OAuthProviderKind = "google"
 	OAuthProviderApple  OAuthProviderKind = "apple"
 	OAuthProviderVK     OAuthProviderKind = "vk"
+	OAuthProviderYandex OAuthProviderKind = "yandex"
 )
 
 func ParseOAuthProvider(raw string) (OAuthProviderKind, error) {
@@ -27,6 +28,8 @@ func ParseOAuthProvider(raw string) (OAuthProviderKind, error) {
 		return OAuthProviderApple, nil
 	case OAuthProviderVK:
 		return OAuthProviderVK, nil
+	case OAuthProviderYandex:
+		return OAuthProviderYandex, nil
 	default:
 		return "", fmt.Errorf("%w: unsupported oauth provider %q", sherrors.ErrInvalidInput, raw)
 	}
