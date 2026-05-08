@@ -28,6 +28,7 @@ proto:
 	       proto/core/catalog.proto \
 	       proto/core/offers.proto \
 	       proto/ml/analogs.proto \
+	       proto/ml/voice.proto \
 	       proto/optimization/optimization.proto
 
 swagger:

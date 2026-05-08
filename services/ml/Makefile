@@ -23,10 +23,11 @@ proto:
 		--python_out=$(OUT_DIR) \
 		--grpc_python_out=$(OUT_DIR) \
 		$(PROTO_DIR)/ml/analogs.proto \
+		$(PROTO_DIR)/ml/voice.proto \
 		$(PROTO_DIR)/core/catalog.proto
 	$(PYTHON) -c 'from pathlib import Path; \
-paths=[Path("src/proto/analogs_pb2_grpc.py"), Path("src/proto/catalog_pb2_grpc.py")]; \
-repls=[("import analogs_pb2 as analogs__pb2","from . import analogs_pb2 as analogs__pb2"),("import catalog_pb2 as catalog__pb2","from . import catalog_pb2 as catalog__pb2")]; \
+paths=[Path("src/proto/analogs_pb2_grpc.py"), Path("src/proto/voice_pb2_grpc.py"), Path("src/proto/catalog_pb2_grpc.py")]; \
+repls=[("import analogs_pb2 as analogs__pb2","from . import analogs_pb2 as analogs__pb2"),("import voice_pb2 as voice__pb2","from . import voice_pb2 as voice__pb2"),("import catalog_pb2 as catalog__pb2","from . import catalog_pb2 as catalog__pb2")]; \
 [p.write_text(__import__("functools").reduce(lambda acc, r: acc.replace(*r), repls, p.read_text(encoding="utf-8")), encoding="utf-8") for p in paths]'
 
 test:
