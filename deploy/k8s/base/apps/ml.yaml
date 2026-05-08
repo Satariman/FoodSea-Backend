@@ -32,6 +32,23 @@ spec:
               value: "0.5"
             - name: PRICE_WEIGHT
               value: "10.0"
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: api-key
+            - name: GEMINI_MODEL
+              value: gemini-embedding-2
+            - name: GEMINI_OUTPUT_DIM
+              value: "768"
+            - name: VOICE_INDEX_PATH
+              value: /app/data/voice_index.pkl
+            - name: VOICE_MIN_NGRAM_SCORE
+              value: "0.6"
+            - name: VOICE_MAX_NGRAM_LEN
+              value: "3"
+            - name: VOICE_EMBEDDING_CACHE_SIZE
+              value: "10000"
           ports:
             - containerPort: 50051
               name: grpc
