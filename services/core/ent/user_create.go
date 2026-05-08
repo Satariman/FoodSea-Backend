@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/foodsea/core/ent/cart"
+	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/user"
 	"github.com/google/uuid"
 )
@@ -84,6 +85,14 @@ func (_c *UserCreate) SetPasswordHash(v string) *UserCreate {
 	return _c
 }
 
+// SetNillablePasswordHash sets the "password_hash" field if the given value is not nil.
+func (_c *UserCreate) SetNillablePasswordHash(v *string) *UserCreate {
+	if v != nil {
+		_c.SetPasswordHash(*v)
+	}
+	return _c
+}
+
 // SetOnboardingDone sets the "onboarding_done" field.
 func (_c *UserCreate) SetOnboardingDone(v bool) *UserCreate {
 	_c.mutation.SetOnboardingDone(v)
@@ -129,6 +138,21 @@ func (_c *UserCreate) SetNillableCartID(id *uuid.UUID) *UserCreate {
 // SetCart sets the "cart" edge to the Cart entity.
 func (_c *UserCreate) SetCart(v *Cart) *UserCreate {
 	return _c.SetCartID(v.ID)
+}
+
+// AddOauthIdentityIDs adds the "oauth_identities" edge to the OAuthIdentity entity by IDs.
+func (_c *UserCreate) AddOauthIdentityIDs(ids ...uuid.UUID) *UserCreate {
+	_c.mutation.AddOauthIdentityIDs(ids...)
+	return _c
+}
+
+// AddOauthIdentities adds the "oauth_identities" edges to the OAuthIdentity entity.
+func (_c *UserCreate) AddOauthIdentities(v ...*OAuthIdentity) *UserCreate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOauthIdentityIDs(ids...)
 }
 
 // Mutation returns the UserMutation object of the builder.
@@ -204,14 +228,6 @@ func (_c *UserCreate) check() error {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "User.updated_at"`)}
 	}
-	if _, ok := _c.mutation.PasswordHash(); !ok {
-		return &ValidationError{Name: "password_hash", err: errors.New(`ent: missing required field "User.password_hash"`)}
-	}
-	if v, ok := _c.mutation.PasswordHash(); ok {
-		if err := user.PasswordHashValidator(v); err != nil {
-			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "User.password_hash": %w`, err)}
-		}
-	}
 	if _, ok := _c.mutation.OnboardingDone(); !ok {
 		return &ValidationError{Name: "onboarding_done", err: errors.New(`ent: missing required field "User.onboarding_done"`)}
 	}
@@ -268,7 +284,7 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	}
 	if value, ok := _c.mutation.PasswordHash(); ok {
 		_spec.SetField(user.FieldPasswordHash, field.TypeString, value)
-		_node.PasswordHash = value
+		_node.PasswordHash = &value
 	}
 	if value, ok := _c.mutation.OnboardingDone(); ok {
 		_spec.SetField(user.FieldOnboardingDone, field.TypeBool, value)
@@ -283,6 +299,22 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(cart.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OauthIdentitiesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(oauthidentity.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

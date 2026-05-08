@@ -22,6 +22,8 @@ type Tx struct {
 	Category *CategoryClient
 	// DeliveryCondition is the client for interacting with the DeliveryCondition builders.
 	DeliveryCondition *DeliveryConditionClient
+	// OAuthIdentity is the client for interacting with the OAuthIdentity builders.
+	OAuthIdentity *OAuthIdentityClient
 	// Offer is the client for interacting with the Offer builders.
 	Offer *OfferClient
 	// Product is the client for interacting with the Product builders.
@@ -168,6 +170,7 @@ func (tx *Tx) init() {
 	tx.CartItem = NewCartItemClient(tx.config)
 	tx.Category = NewCategoryClient(tx.config)
 	tx.DeliveryCondition = NewDeliveryConditionClient(tx.config)
+	tx.OAuthIdentity = NewOAuthIdentityClient(tx.config)
 	tx.Offer = NewOfferClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductNutrition = NewProductNutritionClient(tx.config)

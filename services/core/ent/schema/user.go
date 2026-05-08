@@ -25,7 +25,7 @@ func (User) Fields() []ent.Field {
 		field.UUID("id", uuid.UUID{}).Default(uuid.New).Immutable(),
 		field.String("phone").Optional().Nillable().Unique(),
 		field.String("email").Optional().Nillable().Unique(),
-		field.String("password_hash").NotEmpty(),
+		field.String("password_hash").Optional().Nillable(),
 		field.Bool("onboarding_done").Default(false),
 	}
 }
@@ -33,5 +33,6 @@ func (User) Fields() []ent.Field {
 func (User) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("cart", Cart.Type).Unique(),
+		edge.To("oauth_identities", OAuthIdentity.Type),
 	}
 }

@@ -112,7 +112,18 @@ func TestUserRepo_Integration(t *testing.T) {
 
 		hash, err := repo.GetPasswordHash(ctx, u.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "secrethash", hash)
+		require.NotNil(t, hash)
+		assert.Equal(t, "secrethash", *hash)
+	})
+
+	t.Run("create oauth-only user without password hash", func(t *testing.T) {
+		email := "oauth_" + uuid.NewString()[:8] + "@example.com"
+		u := &domain.User{ID: uuid.New(), Email: &email}
+		require.NoError(t, repo.CreateOAuth(ctx, u))
+
+		hash, err := repo.GetPasswordHash(ctx, u.ID)
+		require.NoError(t, err)
+		assert.Nil(t, hash)
 	})
 
 	t.Run("set onboarding done — idempotent", func(t *testing.T) {

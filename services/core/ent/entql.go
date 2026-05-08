@@ -8,6 +8,7 @@ import (
 	"github.com/foodsea/core/ent/cartitem"
 	"github.com/foodsea/core/ent/category"
 	"github.com/foodsea/core/ent/deliverycondition"
+	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
 	"github.com/foodsea/core/ent/predicate"
 	"github.com/foodsea/core/ent/product"
@@ -23,7 +24,7 @@ import (
 
 // schemaGraph holds a representation of ent/schema at runtime.
 var schemaGraph = func() *sqlgraph.Schema {
-	graph := &sqlgraph.Schema{Nodes: make([]*sqlgraph.Node, 10)}
+	graph := &sqlgraph.Schema{Nodes: make([]*sqlgraph.Node, 11)}
 	graph.Nodes[0] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   brand.Table,
@@ -110,6 +111,25 @@ var schemaGraph = func() *sqlgraph.Schema {
 	}
 	graph.Nodes[5] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
+			Table:   oauthidentity.Table,
+			Columns: oauthidentity.Columns,
+			ID: &sqlgraph.FieldSpec{
+				Type:   field.TypeUUID,
+				Column: oauthidentity.FieldID,
+			},
+		},
+		Type: "OAuthIdentity",
+		Fields: map[string]*sqlgraph.FieldSpec{
+			oauthidentity.FieldCreatedAt:      {Type: field.TypeTime, Column: oauthidentity.FieldCreatedAt},
+			oauthidentity.FieldUpdatedAt:      {Type: field.TypeTime, Column: oauthidentity.FieldUpdatedAt},
+			oauthidentity.FieldProvider:       {Type: field.TypeString, Column: oauthidentity.FieldProvider},
+			oauthidentity.FieldProviderUserID: {Type: field.TypeString, Column: oauthidentity.FieldProviderUserID},
+			oauthidentity.FieldEmail:          {Type: field.TypeString, Column: oauthidentity.FieldEmail},
+			oauthidentity.FieldUserID:         {Type: field.TypeUUID, Column: oauthidentity.FieldUserID},
+		},
+	}
+	graph.Nodes[6] = &sqlgraph.Node{
+		NodeSpec: sqlgraph.NodeSpec{
 			Table:   offer.Table,
 			Columns: offer.Columns,
 			ID: &sqlgraph.FieldSpec{
@@ -128,7 +148,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			offer.FieldUpdatedAt:            {Type: field.TypeTime, Column: offer.FieldUpdatedAt},
 		},
 	}
-	graph.Nodes[6] = &sqlgraph.Node{
+	graph.Nodes[7] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   product.Table,
 			Columns: product.Columns,
@@ -153,7 +173,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			product.FieldBrandID:       {Type: field.TypeUUID, Column: product.FieldBrandID},
 		},
 	}
-	graph.Nodes[7] = &sqlgraph.Node{
+	graph.Nodes[8] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   productnutrition.Table,
 			Columns: productnutrition.Columns,
@@ -171,7 +191,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			productnutrition.FieldCarbohydrates: {Type: field.TypeFloat64, Column: productnutrition.FieldCarbohydrates},
 		},
 	}
-	graph.Nodes[8] = &sqlgraph.Node{
+	graph.Nodes[9] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   store.Table,
 			Columns: store.Columns,
@@ -189,7 +209,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			store.FieldCreatedAt: {Type: field.TypeTime, Column: store.FieldCreatedAt},
 		},
 	}
-	graph.Nodes[9] = &sqlgraph.Node{
+	graph.Nodes[10] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   user.Table,
 			Columns: user.Columns,
@@ -327,6 +347,18 @@ var schemaGraph = func() *sqlgraph.Schema {
 		},
 		"DeliveryCondition",
 		"Store",
+	)
+	graph.MustAddE(
+		"user",
+		&sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   oauthidentity.UserTable,
+			Columns: []string{oauthidentity.UserColumn},
+			Bidi:    false,
+		},
+		"OAuthIdentity",
+		"User",
 	)
 	graph.MustAddE(
 		"product",
@@ -471,6 +503,18 @@ var schemaGraph = func() *sqlgraph.Schema {
 		},
 		"User",
 		"Cart",
+	)
+	graph.MustAddE(
+		"oauth_identities",
+		&sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+		},
+		"User",
+		"OAuthIdentity",
 	)
 	return graph
 }()
@@ -917,6 +961,90 @@ func (f *DeliveryConditionFilter) WhereHasStoreWith(preds ...predicate.Store) {
 }
 
 // addPredicate implements the predicateAdder interface.
+func (_q *OAuthIdentityQuery) addPredicate(pred func(s *sql.Selector)) {
+	_q.predicates = append(_q.predicates, pred)
+}
+
+// Filter returns a Filter implementation to apply filters on the OAuthIdentityQuery builder.
+func (_q *OAuthIdentityQuery) Filter() *OAuthIdentityFilter {
+	return &OAuthIdentityFilter{config: _q.config, predicateAdder: _q}
+}
+
+// addPredicate implements the predicateAdder interface.
+func (m *OAuthIdentityMutation) addPredicate(pred func(s *sql.Selector)) {
+	m.predicates = append(m.predicates, pred)
+}
+
+// Filter returns an entql.Where implementation to apply filters on the OAuthIdentityMutation builder.
+func (m *OAuthIdentityMutation) Filter() *OAuthIdentityFilter {
+	return &OAuthIdentityFilter{config: m.config, predicateAdder: m}
+}
+
+// OAuthIdentityFilter provides a generic filtering capability at runtime for OAuthIdentityQuery.
+type OAuthIdentityFilter struct {
+	predicateAdder
+	config
+}
+
+// Where applies the entql predicate on the query filter.
+func (f *OAuthIdentityFilter) Where(p entql.P) {
+	f.addPredicate(func(s *sql.Selector) {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[5].Type, p, s); err != nil {
+			s.AddError(err)
+		}
+	})
+}
+
+// WhereID applies the entql [16]byte predicate on the id field.
+func (f *OAuthIdentityFilter) WhereID(p entql.ValueP) {
+	f.Where(p.Field(oauthidentity.FieldID))
+}
+
+// WhereCreatedAt applies the entql time.Time predicate on the created_at field.
+func (f *OAuthIdentityFilter) WhereCreatedAt(p entql.TimeP) {
+	f.Where(p.Field(oauthidentity.FieldCreatedAt))
+}
+
+// WhereUpdatedAt applies the entql time.Time predicate on the updated_at field.
+func (f *OAuthIdentityFilter) WhereUpdatedAt(p entql.TimeP) {
+	f.Where(p.Field(oauthidentity.FieldUpdatedAt))
+}
+
+// WhereProvider applies the entql string predicate on the provider field.
+func (f *OAuthIdentityFilter) WhereProvider(p entql.StringP) {
+	f.Where(p.Field(oauthidentity.FieldProvider))
+}
+
+// WhereProviderUserID applies the entql string predicate on the provider_user_id field.
+func (f *OAuthIdentityFilter) WhereProviderUserID(p entql.StringP) {
+	f.Where(p.Field(oauthidentity.FieldProviderUserID))
+}
+
+// WhereEmail applies the entql string predicate on the email field.
+func (f *OAuthIdentityFilter) WhereEmail(p entql.StringP) {
+	f.Where(p.Field(oauthidentity.FieldEmail))
+}
+
+// WhereUserID applies the entql [16]byte predicate on the user_id field.
+func (f *OAuthIdentityFilter) WhereUserID(p entql.ValueP) {
+	f.Where(p.Field(oauthidentity.FieldUserID))
+}
+
+// WhereHasUser applies a predicate to check if query has an edge user.
+func (f *OAuthIdentityFilter) WhereHasUser() {
+	f.Where(entql.HasEdge("user"))
+}
+
+// WhereHasUserWith applies a predicate to check if query has an edge user with a given conditions (other predicates).
+func (f *OAuthIdentityFilter) WhereHasUserWith(preds ...predicate.User) {
+	f.Where(entql.HasEdgeWith("user", sqlgraph.WrapFunc(func(s *sql.Selector) {
+		for _, p := range preds {
+			p(s)
+		}
+	})))
+}
+
+// addPredicate implements the predicateAdder interface.
 func (_q *OfferQuery) addPredicate(pred func(s *sql.Selector)) {
 	_q.predicates = append(_q.predicates, pred)
 }
@@ -945,7 +1073,7 @@ type OfferFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *OfferFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[5].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[6].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1048,7 +1176,7 @@ type ProductFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *ProductFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[6].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[7].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1232,7 +1360,7 @@ type ProductNutritionFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *ProductNutritionFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[7].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[8].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1311,7 +1439,7 @@ type StoreFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *StoreFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[8].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[9].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1404,7 +1532,7 @@ type UserFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *UserFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[9].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[10].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1453,6 +1581,20 @@ func (f *UserFilter) WhereHasCart() {
 // WhereHasCartWith applies a predicate to check if query has an edge cart with a given conditions (other predicates).
 func (f *UserFilter) WhereHasCartWith(preds ...predicate.Cart) {
 	f.Where(entql.HasEdgeWith("cart", sqlgraph.WrapFunc(func(s *sql.Selector) {
+		for _, p := range preds {
+			p(s)
+		}
+	})))
+}
+
+// WhereHasOauthIdentities applies a predicate to check if query has an edge oauth_identities.
+func (f *UserFilter) WhereHasOauthIdentities() {
+	f.Where(entql.HasEdge("oauth_identities"))
+}
+
+// WhereHasOauthIdentitiesWith applies a predicate to check if query has an edge oauth_identities with a given conditions (other predicates).
+func (f *UserFilter) WhereHasOauthIdentitiesWith(preds ...predicate.OAuthIdentity) {
+	f.Where(entql.HasEdgeWith("oauth_identities", sqlgraph.WrapFunc(func(s *sql.Selector) {
 		for _, p := range preds {
 			p(s)
 		}

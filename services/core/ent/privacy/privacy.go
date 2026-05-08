@@ -231,6 +231,30 @@ func (f DeliveryConditionMutationRuleFunc) EvalMutation(ctx context.Context, m e
 	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.DeliveryConditionMutation", m)
 }
 
+// The OAuthIdentityQueryRuleFunc type is an adapter to allow the use of ordinary
+// functions as a query rule.
+type OAuthIdentityQueryRuleFunc func(context.Context, *ent.OAuthIdentityQuery) error
+
+// EvalQuery return f(ctx, q).
+func (f OAuthIdentityQueryRuleFunc) EvalQuery(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.OAuthIdentityQuery); ok {
+		return f(ctx, q)
+	}
+	return Denyf("ent/privacy: unexpected query type %T, expect *ent.OAuthIdentityQuery", q)
+}
+
+// The OAuthIdentityMutationRuleFunc type is an adapter to allow the use of ordinary
+// functions as a mutation rule.
+type OAuthIdentityMutationRuleFunc func(context.Context, *ent.OAuthIdentityMutation) error
+
+// EvalMutation calls f(ctx, m).
+func (f OAuthIdentityMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation) error {
+	if m, ok := m.(*ent.OAuthIdentityMutation); ok {
+		return f(ctx, m)
+	}
+	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.OAuthIdentityMutation", m)
+}
+
 // The OfferQueryRuleFunc type is an adapter to allow the use of ordinary
 // functions as a query rule.
 type OfferQueryRuleFunc func(context.Context, *ent.OfferQuery) error
@@ -396,6 +420,8 @@ func queryFilter(q ent.Query) (Filter, error) {
 		return q.Filter(), nil
 	case *ent.DeliveryConditionQuery:
 		return q.Filter(), nil
+	case *ent.OAuthIdentityQuery:
+		return q.Filter(), nil
 	case *ent.OfferQuery:
 		return q.Filter(), nil
 	case *ent.ProductQuery:
@@ -422,6 +448,8 @@ func mutationFilter(m ent.Mutation) (Filter, error) {
 	case *ent.CategoryMutation:
 		return m.Filter(), nil
 	case *ent.DeliveryConditionMutation:
+		return m.Filter(), nil
+	case *ent.OAuthIdentityMutation:
 		return m.Filter(), nil
 	case *ent.OfferMutation:
 		return m.Filter(), nil

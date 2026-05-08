@@ -40,6 +40,25 @@ func (r *UserRepo) Create(ctx context.Context, u *domain.User, passwordHash stri
 	return nil
 }
 
+func (r *UserRepo) CreateOAuth(ctx context.Context, u *domain.User) error {
+	created, err := r.client.User.Create().
+		SetID(u.ID).
+		SetOnboardingDone(u.OnboardingDone).
+		SetNillableEmail(u.Email).
+		SetNillablePhone(u.Phone).
+		Save(ctx)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			return sherrors.ErrAlreadyExists
+		}
+		return fmt.Errorf("creating oauth user: %w", err)
+	}
+
+	u.CreatedAt = created.CreatedAt
+	u.UpdatedAt = created.UpdatedAt
+	return nil
+}
+
 func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	u, err := r.client.User.Get(ctx, id)
 	if err != nil {
@@ -73,16 +92,16 @@ func (r *UserRepo) GetByPhone(ctx context.Context, phone string) (*domain.User, 
 	return toDomainUser(u), nil
 }
 
-func (r *UserRepo) GetPasswordHash(ctx context.Context, id uuid.UUID) (string, error) {
+func (r *UserRepo) GetPasswordHash(ctx context.Context, id uuid.UUID) (*string, error) {
 	u, err := r.client.User.Query().
 		Where(user.ID(id)).
 		Select(user.FieldPasswordHash).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return "", sherrors.ErrNotFound
+			return nil, sherrors.ErrNotFound
 		}
-		return "", fmt.Errorf("getting password hash: %w", err)
+		return nil, fmt.Errorf("getting password hash: %w", err)
 	}
 	return u.PasswordHash, nil
 }
