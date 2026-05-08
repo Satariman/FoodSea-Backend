@@ -134,13 +134,14 @@ func (x *ParseShoppingListResponse) GetUnmatchedQueries() []string {
 }
 
 type VoiceItem struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	ProductName   string                 `protobuf:"bytes,2,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
-	Quantity      int32                  `protobuf:"varint,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
-	Unit          string                 `protobuf:"bytes,4,opt,name=unit,proto3" json:"unit,omitempty"`
-	Confidence    float64                `protobuf:"fixed64,5,opt,name=confidence,proto3" json:"confidence,omitempty"`
-	RawQuery      string                 `protobuf:"bytes,6,opt,name=raw_query,json=rawQuery,proto3" json:"raw_query,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ProductId   string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	ProductName string                 `protobuf:"bytes,2,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
+	// Floored to integer; fractional Russian numerals (пол, полтора) are rounded down.
+	Quantity      int32   `protobuf:"varint,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	Unit          string  `protobuf:"bytes,4,opt,name=unit,proto3" json:"unit,omitempty"`
+	Confidence    float64 `protobuf:"fixed64,5,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	RawQuery      string  `protobuf:"bytes,6,opt,name=raw_query,json=rawQuery,proto3" json:"raw_query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

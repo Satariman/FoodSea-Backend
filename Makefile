@@ -209,7 +209,10 @@ dev-all:
 	$(MAKE) swagger
 	@mkdir -p $(DEV_STATE_DIR)
 	@if [ ! -d services/ml/.venv ]; then cd services/ml && $(MAKE) install; fi
-	@if [ ! -f services/ml/src/proto/analogs_pb2.py ]; then cd services/ml && $(MAKE) proto; fi
+	@if [ ! -f services/ml/src/proto/analogs_pb2.py ] || \
+	    [ ! -f services/ml/src/proto/voice_pb2.py ]; then \
+	    cd services/ml && $(MAKE) proto; \
+	fi
 	@if [ -f $(DEV_STATE_DIR)/ml.pid ] && kill -0 $$(cat $(DEV_STATE_DIR)/ml.pid) 2>/dev/null; then \
 		echo "ml-service already running"; \
 	else \
