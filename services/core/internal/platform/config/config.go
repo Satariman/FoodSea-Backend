@@ -18,6 +18,7 @@ type Config struct {
 	Kafka  KafkaConfig
 	JWT    JWTConfig
 	S3     S3Config
+	OAuth  OAuthConfig
 }
 
 type S3Config struct {
@@ -56,6 +57,23 @@ type JWTConfig struct {
 	Secret     string
 	AccessTTL  time.Duration
 	RefreshTTL time.Duration
+}
+
+type OAuthConfig struct {
+	StateTTL            time.Duration
+	AllowedRedirectURIs []string
+	Google              OAuthProviderConfig
+	Yandex              OAuthProviderConfig
+}
+
+type OAuthProviderConfig struct {
+	Enabled      bool
+	ClientID     string
+	ClientSecret string
+	AuthURL      string
+	TokenURL     string
+	UserInfoURL  string
+	Scopes       []string
 }
 
 // Load reads configuration from environment variables and validates it.
@@ -123,9 +141,64 @@ func Load() (*Config, error) {
 			UseSSL:          getEnvBool("S3_USE_SSL", false),
 			PublicBaseURL:   getEnv("S3_PUBLIC_BASE_URL", "http://localhost:9000/product-images"),
 		},
+		OAuth: OAuthConfig{
+			StateTTL:            getEnvDuration("OAUTH_STATE_TTL", 10*time.Minute),
+			AllowedRedirectURIs: getEnvStrings("OAUTH_ALLOWED_REDIRECT_URIS", []string{}),
+			Google: oauthProviderConfig("GOOGLE", OAuthProviderConfig{
+				AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
+				TokenURL:    "https://oauth2.googleapis.com/token",
+				UserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
+				Scopes:      []string{"openid", "email", "profile"},
+			}),
+			Yandex: oauthProviderConfig("YANDEX", OAuthProviderConfig{
+				AuthURL:     "https://oauth.yandex.ru/authorize",
+				TokenURL:    "https://oauth.yandex.ru/token",
+				UserInfoURL: "https://login.yandex.ru/info",
+				Scopes:      []string{"login:email", "login:info"},
+			}),
+		},
+	}
+
+	if err := validateOAuthProvider("GOOGLE", cfg.OAuth.Google); err != nil {
+		return nil, err
+	}
+	if err := validateOAuthProvider("YANDEX", cfg.OAuth.Yandex); err != nil {
+		return nil, err
+	}
+	if env == "production" && (cfg.OAuth.Google.Enabled || cfg.OAuth.Yandex.Enabled) && len(cfg.OAuth.AllowedRedirectURIs) == 0 {
+		return nil, fmt.Errorf("OAUTH_ALLOWED_REDIRECT_URIS must be set in production when OAuth is enabled")
 	}
 
 	return cfg, nil
+}
+
+func oauthProviderConfig(provider string, defaults OAuthProviderConfig) OAuthProviderConfig {
+	clientID := getEnv("OAUTH_"+provider+"_CLIENT_ID", "")
+	clientSecret := getEnv("OAUTH_"+provider+"_CLIENT_SECRET", "")
+
+	cfg := defaults
+	cfg.ClientID = clientID
+	cfg.ClientSecret = clientSecret
+	cfg.Enabled = clientID != "" && clientSecret != ""
+	cfg.AuthURL = getEnv("OAUTH_"+provider+"_AUTH_URL", defaults.AuthURL)
+	cfg.TokenURL = getEnv("OAUTH_"+provider+"_TOKEN_URL", defaults.TokenURL)
+	cfg.UserInfoURL = getEnv("OAUTH_"+provider+"_USER_INFO_URL", defaults.UserInfoURL)
+	cfg.Scopes = getEnvStrings("OAUTH_"+provider+"_SCOPES", defaults.Scopes)
+
+	return cfg
+}
+
+func validateOAuthProvider(provider string, cfg OAuthProviderConfig) error {
+	clientIDKey := "OAUTH_" + provider + "_CLIENT_ID"
+	clientSecretKey := "OAUTH_" + provider + "_CLIENT_SECRET"
+
+	hasClientID := cfg.ClientID != ""
+	hasClientSecret := cfg.ClientSecret != ""
+	if hasClientID != hasClientSecret {
+		return fmt.Errorf("%s and %s must be set together", clientIDKey, clientSecretKey)
+	}
+
+	return nil
 }
 
 func getEnv(key, defaultValue string) string {
