@@ -2,7 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/foodsea/core/ent"
 	"github.com/foodsea/core/ent/oauthidentity"
@@ -48,7 +52,7 @@ func (r *OAuthIdentityRepo) Create(ctx context.Context, identity *domain.OAuthId
 		SetNillableEmail(identity.Email).
 		Save(ctx)
 	if err != nil {
-		if ent.IsConstraintError(err) {
+		if isUniqueViolation(err) {
 			return sherrors.ErrAlreadyExists
 		}
 		return fmt.Errorf("creating oauth identity: %w", err)
@@ -57,6 +61,17 @@ func (r *OAuthIdentityRepo) Create(ctx context.Context, identity *domain.OAuthId
 	identity.CreatedAt = created.CreatedAt
 	identity.UpdatedAt = created.UpdatedAt
 	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+
+	// Fallback when driver-specific error isn't available through wrappers.
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate key value") && strings.Contains(msg, "unique constraint")
 }
 
 func toDomainOAuthIdentity(identity *ent.OAuthIdentity) *domain.OAuthIdentity {

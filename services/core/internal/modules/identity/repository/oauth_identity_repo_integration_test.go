@@ -98,6 +98,17 @@ func TestOAuthIdentityRepo_Integration(t *testing.T) {
 		assert.ErrorIs(t, err, sherrors.ErrAlreadyExists)
 	})
 
+	t.Run("non-existent user id does not map to already exists", func(t *testing.T) {
+		err := oauthRepo.Create(ctx, &domain.OAuthIdentity{
+			ID:             uuid.New(),
+			UserID:         uuid.New(),
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "fk_missing_user_" + uuid.NewString(),
+		})
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, sherrors.ErrAlreadyExists)
+	})
+
 	t.Run("parallel create same subject one wins", func(t *testing.T) {
 		email1 := "race_sub_1_" + uuid.NewString()[:8] + "@example.com"
 		u1 := &domain.User{ID: uuid.New(), Email: &email1}
