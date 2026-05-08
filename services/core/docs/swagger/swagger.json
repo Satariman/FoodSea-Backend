@@ -1294,6 +1294,75 @@
                     }
                 }
             }
+        },
+        "/voice/parse": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forwards the user's spoken or typed shopping list to the ML service and returns matched products.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Voice"
+                ],
+                "summary": "Parse a voice/text shopping list",
+                "parameters": [
+                    {
+                        "description": "Parse voice request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_voice_handler.ParseVoiceRequestDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_voice_handler.ParseVoiceResponseDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1855,6 +1924,57 @@
                     "type": "number"
                 },
                 "subcategory_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_voice_handler.ParseVoiceRequestDTO": {
+            "type": "object",
+            "properties": {
+                "locale": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_voice_handler.ParseVoiceResponseDTO": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_modules_voice_handler.VoiceItemDTO"
+                    }
+                },
+                "unmatched_queries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "internal_modules_voice_handler.VoiceItemDTO": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "product_id": {
+                    "type": "string"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "raw_query": {
+                    "type": "string"
+                },
+                "unit": {
                     "type": "string"
                 }
             }

@@ -367,6 +367,39 @@ definitions:
       subcategory_id:
         type: string
     type: object
+  internal_modules_voice_handler.ParseVoiceRequestDTO:
+    properties:
+      locale:
+        type: string
+      text:
+        type: string
+    type: object
+  internal_modules_voice_handler.ParseVoiceResponseDTO:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_voice_handler.VoiceItemDTO'
+        type: array
+      unmatched_queries:
+        items:
+          type: string
+        type: array
+    type: object
+  internal_modules_voice_handler.VoiceItemDTO:
+    properties:
+      confidence:
+        type: number
+      product_id:
+        type: string
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      raw_query:
+        type: string
+      unit:
+        type: string
+    type: object
 host: localhost:8081
 info:
   contact: {}
@@ -1160,6 +1193,48 @@ paths:
       summary: Complete onboarding
       tags:
       - users
+  /voice/parse:
+    post:
+      consumes:
+      - application/json
+      description: Forwards the user's spoken or typed shopping list to the ML service
+        and returns matched products.
+      parameters:
+      - description: Parse voice request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_voice_handler.ParseVoiceRequestDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_voice_handler.ParseVoiceResponseDTO'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Parse a voice/text shopping list
+      tags:
+      - Voice
 securityDefinitions:
   BearerAuth:
     description: 'JWT токен. Формат: "Bearer {token}"'
