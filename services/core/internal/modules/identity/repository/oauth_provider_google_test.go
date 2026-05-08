@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +17,14 @@ import (
 	"github.com/foodsea/core/internal/platform/config"
 	sherrors "github.com/foodsea/core/internal/shared/errors"
 )
+
+func TestGoogleOAuthProvider_NameAndDefaultClient(t *testing.T) {
+	t.Parallel()
+
+	p := NewGoogleOAuthProvider(config.OAuthProviderConfig{}, nil)
+	assert.Equal(t, domain.OAuthProviderGoogle, p.Name())
+	require.NotNil(t, p.client)
+}
 
 func TestGoogleOAuthProvider_AuthURL(t *testing.T) {
 	p := NewGoogleOAuthProvider(config.OAuthProviderConfig{
@@ -40,12 +49,12 @@ func TestGoogleOAuthProvider_AuthURL(t *testing.T) {
 
 func TestGoogleOAuthProvider_Exchange(t *testing.T) {
 	type tc struct {
-		name          string
-		tokenStatus   int
-		claims        map[string]any
-		wantErr       error
-		wantEmail     *string
-		wantVerified  bool
+		name         string
+		tokenStatus  int
+		claims       map[string]any
+		wantErr      error
+		wantEmail    *string
+		wantVerified bool
 	}
 
 	nowExp := time.Now().Add(time.Hour).Unix()
@@ -69,6 +78,12 @@ func TestGoogleOAuthProvider_Exchange(t *testing.T) {
 		{
 			name:        "token endpoint non-200 unauthorized",
 			tokenStatus: http.StatusUnauthorized,
+			wantErr:     sherrors.ErrUnauthorized,
+		},
+		{
+			name:        "malformed id token unauthorized",
+			tokenStatus: http.StatusOK,
+			claims:      nil,
 			wantErr:     sherrors.ErrUnauthorized,
 		},
 		{
@@ -127,9 +142,13 @@ func TestGoogleOAuthProvider_Exchange(t *testing.T) {
 					_, _ = w.Write([]byte(`{"error":"bad"}`))
 					return
 				}
+				idToken := "malformed"
+				if tt.claims != nil {
+					idToken = buildUnsignedJWT(tt.claims)
+				}
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"access_token": "access",
-					"id_token":     buildUnsignedJWT(tt.claims),
+					"id_token":     idToken,
 				})
 			}))
 			defer srv.Close()
@@ -160,6 +179,90 @@ func TestGoogleOAuthProvider_Exchange(t *testing.T) {
 				require.NotNil(t, profile.Email)
 				assert.Equal(t, *tt.wantEmail, *profile.Email)
 			}
+		})
+	}
+}
+
+func TestParseGoogleIDTokenClaims(t *testing.T) {
+	t.Parallel()
+
+	t.Run("malformed jwt", func(t *testing.T) {
+		_, err := parseGoogleIDTokenClaims("not-a-jwt")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "malformed jwt")
+	})
+
+	t.Run("invalid payload base64", func(t *testing.T) {
+		_, err := parseGoogleIDTokenClaims("a.!.c")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "decode payload")
+	})
+
+	t.Run("invalid payload json", func(t *testing.T) {
+		token := "a." + "eA" + ".c"
+		_, err := parseGoogleIDTokenClaims(token)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unmarshal claims")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		email := "ok@example.com"
+		token := buildUnsignedJWT(map[string]any{
+			"iss":            "https://accounts.google.com",
+			"aud":            "client-1",
+			"exp":            time.Now().Add(time.Hour).Unix(),
+			"nonce":          "state-1",
+			"sub":            "sub-1",
+			"email":          email,
+			"email_verified": true,
+		})
+		claims, err := parseGoogleIDTokenClaims(token)
+		require.NoError(t, err)
+		assert.Equal(t, "sub-1", claims.Sub)
+		require.NotNil(t, claims.Email)
+		assert.Equal(t, email, *claims.Email)
+	})
+}
+
+func TestValidateGoogleClaims(t *testing.T) {
+	t.Parallel()
+
+	base := googleIDTokenClaims{
+		Iss:   "https://accounts.google.com",
+		Aud:   "client-1",
+		Exp:   time.Now().Add(time.Hour).Unix(),
+		Nonce: "state-1",
+		Sub:   "sub-1",
+	}
+
+	tests := []struct {
+		name    string
+		claims  googleIDTokenClaims
+		client  string
+		nonce   string
+		wantErr error
+	}{
+		{name: "success", claims: base, client: "client-1", nonce: "state-1"},
+		{name: "success alt issuer", claims: func() googleIDTokenClaims { c := base; c.Iss = "accounts.google.com"; return c }(), client: "client-1", nonce: "state-1"},
+		{name: "invalid issuer", claims: func() googleIDTokenClaims { c := base; c.Iss = "issuer"; return c }(), client: "client-1", nonce: "state-1", wantErr: errors.New("invalid issuer")},
+		{name: "invalid audience", claims: base, client: "other", nonce: "state-1", wantErr: errors.New("invalid audience")},
+		{name: "empty client", claims: base, client: "", nonce: "state-1", wantErr: errors.New("invalid audience")},
+		{name: "expired token", claims: func() googleIDTokenClaims { c := base; c.Exp = time.Now().Add(-time.Minute).Unix(); return c }(), client: "client-1", nonce: "state-1", wantErr: errors.New("token expired")},
+		{name: "empty expected nonce", claims: base, client: "client-1", nonce: "", wantErr: errors.New("invalid nonce")},
+		{name: "nonce mismatch", claims: base, client: "client-1", nonce: "other", wantErr: errors.New("invalid nonce")},
+		{name: "missing sub", claims: func() googleIDTokenClaims { c := base; c.Sub = " "; return c }(), client: "client-1", nonce: "state-1", wantErr: errors.New("missing sub")},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateGoogleClaims(tt.claims, tt.client, tt.nonce)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr.Error(), err.Error())
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }

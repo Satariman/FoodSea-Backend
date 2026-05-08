@@ -36,6 +36,14 @@ func TestYandexOAuthProvider_AuthURL(t *testing.T) {
 	assert.Equal(t, "state-y", q.Get("state"))
 }
 
+func TestYandexOAuthProvider_NameAndDefaultClient(t *testing.T) {
+	t.Parallel()
+
+	p := NewYandexOAuthProvider(config.OAuthProviderConfig{}, nil)
+	assert.Equal(t, domain.OAuthProviderYandex, p.Name())
+	require.NotNil(t, p.client)
+}
+
 func TestYandexOAuthProvider_Exchange(t *testing.T) {
 	type tc struct {
 		name           string

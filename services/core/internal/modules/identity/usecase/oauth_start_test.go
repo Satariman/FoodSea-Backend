@@ -82,4 +82,20 @@ func TestOAuthStart_Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, "provider down", err.Error())
 	})
+
+	t.Run("state store create error passthrough", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		provider.On("Name").Return(domain.OAuthProviderGoogle).Once()
+
+		uc := usecase.NewOAuthStart(states, []domain.OAuthProvider{provider}, []string{"/cb"}, stateTTL)
+		states.On("Create", ctx, mock.Anything).Return("", errors.New("redis down")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthStartRequest{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		})
+		require.Error(t, err)
+		assert.Equal(t, "redis down", err.Error())
+	})
 }

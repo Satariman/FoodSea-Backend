@@ -165,4 +165,15 @@ func TestOAuthIdentityRepo_Integration(t *testing.T) {
 		assert.Equal(t, 1, nils, "exactly one create should succeed")
 		assert.Equal(t, 1, alreadyExists, "exactly one create should fail with already exists")
 	})
+
+	t.Run("closed client returns wrapped error on get", func(t *testing.T) {
+		closedClient := startPostgres(t)
+		closedRepo := repository.NewOAuthIdentityRepo(closedClient)
+		require.NoError(t, closedClient.Close())
+
+		_, err := closedRepo.GetByProviderUserID(ctx, domain.OAuthProviderGoogle, "sub_"+uuid.NewString())
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, sherrors.ErrNotFound)
+		assert.Contains(t, err.Error(), "getting oauth identity by provider user id")
+	})
 }

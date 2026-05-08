@@ -216,6 +216,22 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		assert.ErrorIs(t, err, sherrors.ErrInvalidInput)
 	})
 
+	t.Run("callback unsupported provider invalid input", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{
+			Provider: domain.OAuthProviderVK,
+			State:    "state",
+			Code:     "code",
+		})
+		assert.ErrorIs(t, err, sherrors.ErrInvalidInput)
+	})
+
 	t.Run("callback provider repo error passthrough", func(t *testing.T) {
 		states := new(MockOAuthStateStore)
 		provider := new(MockOAuthProvider)
@@ -273,5 +289,262 @@ func TestOAuthCallback_Execute(t *testing.T) {
 
 		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s8", Code: "code-8"})
 		require.NoError(t, err)
+	})
+
+	t.Run("callback state store unexpected error passthrough", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		states.On("Consume", ctx, "s9").Return(domain.OAuthSession{}, errors.New("redis down")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s9", Code: "code"})
+		require.Error(t, err)
+		assert.Equal(t, "redis down", err.Error())
+	})
+
+	t.Run("callback state provider mismatch unauthorized", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		states.On("Consume", ctx, "s10").Return(domain.OAuthSession{
+			Provider:   domain.OAuthProviderYandex,
+			RedirectTo: "/cb",
+		}, nil).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s10", Code: "code"})
+		assert.ErrorIs(t, err, sherrors.ErrUnauthorized)
+	})
+
+	t.Run("callback provider exchange unexpected error passthrough", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		states.On("Consume", ctx, "s11").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-11", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{}, errors.New("provider timeout")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s11", Code: "code-11"})
+		require.Error(t, err)
+		assert.Equal(t, "provider timeout", err.Error())
+	})
+
+	t.Run("callback existing identity but user lookup fails", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		userID := uuid.New()
+		states.On("Consume", ctx, "s12").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-12", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "sub-12",
+			Email:          ptr("u12@example.com"),
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-12").Return(&domain.OAuthIdentity{
+			UserID: userID,
+		}, nil).Once()
+		users.On("GetByID", ctx, userID).Return(nil, errors.New("user lookup failed")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s12", Code: "code-12"})
+		require.Error(t, err)
+		assert.Equal(t, "user lookup failed", err.Error())
+	})
+
+	t.Run("callback user search by email unexpected error", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		email := "user13@example.com"
+		states.On("Consume", ctx, "s13").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-13", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "sub-13",
+			Email:          &email,
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-13").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("GetByEmail", ctx, email).Return(nil, errors.New("db down")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s13", Code: "code-13"})
+		require.Error(t, err)
+		assert.Equal(t, "db down", err.Error())
+	})
+
+	t.Run("callback create oauth user fails", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		email := "user14@example.com"
+		states.On("Consume", ctx, "s14").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-14", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "sub-14",
+			Email:          &email,
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-14").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("GetByEmail", ctx, email).Return(nil, sherrors.ErrNotFound).Once()
+		users.On("CreateOAuth", ctx, mock.AnythingOfType("*domain.User")).Return(errors.New("insert failed")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s14", Code: "code-14"})
+		require.Error(t, err)
+		assert.Equal(t, "insert failed", err.Error())
+	})
+
+	t.Run("callback create identity unexpected error", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		email := "user15@example.com"
+		localUser := &domain.User{ID: uuid.New(), Email: &email}
+		states.On("Consume", ctx, "s15").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-15", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "sub-15",
+			Email:          &email,
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-15").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("GetByEmail", ctx, email).Return(localUser, nil).Once()
+		identities.On("Create", ctx, mock.AnythingOfType("*domain.OAuthIdentity")).Return(errors.New("identity create failed")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s15", Code: "code-15"})
+		require.Error(t, err)
+		assert.Equal(t, "identity create failed", err.Error())
+	})
+
+	t.Run("callback race fallback get linked identity fails", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		email := "race-get-fail@example.com"
+		localUser := &domain.User{ID: uuid.New(), Email: &email}
+		states.On("Consume", ctx, "s16").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-16", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "sub-16",
+			Email:          &email,
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-16").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("GetByEmail", ctx, email).Return(localUser, nil).Once()
+		identities.On("Create", ctx, mock.AnythingOfType("*domain.OAuthIdentity")).Return(sherrors.ErrAlreadyExists).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-16").Return(nil, errors.New("identity lookup failed")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s16", Code: "code-16"})
+		require.Error(t, err)
+		assert.Equal(t, "identity lookup failed", err.Error())
+	})
+
+	t.Run("callback race fallback user lookup fails", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		email := "race-user-fail@example.com"
+		localUser := &domain.User{ID: uuid.New(), Email: &email}
+		linkedIdentity := &domain.OAuthIdentity{ID: uuid.New(), UserID: uuid.New(), Provider: domain.OAuthProviderGoogle, ProviderUserID: "sub-17"}
+		states.On("Consume", ctx, "s17").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-17", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "sub-17",
+			Email:          &email,
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-17").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("GetByEmail", ctx, email).Return(localUser, nil).Once()
+		identities.On("Create", ctx, mock.AnythingOfType("*domain.OAuthIdentity")).Return(sherrors.ErrAlreadyExists).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-17").Return(linkedIdentity, nil).Once()
+		users.On("GetByID", ctx, linkedIdentity.UserID).Return(nil, errors.New("linked user fetch failed")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s17", Code: "code-17"})
+		require.Error(t, err)
+		assert.Equal(t, "linked user fetch failed", err.Error())
+	})
+
+	t.Run("callback token issue fails", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		userID := uuid.New()
+		u := &domain.User{ID: userID, Email: ptr("u18@example.com")}
+		states.On("Consume", ctx, "s18").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
+		provider.On("Exchange", ctx, "code-18", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderGoogle,
+			ProviderUserID: "sub-18",
+			Email:          ptr("u18@example.com"),
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-18").Return(&domain.OAuthIdentity{
+			UserID: userID,
+		}, nil).Once()
+		users.On("GetByID", ctx, userID).Return(u, nil).Once()
+		tokens.On("IssuePair", ctx, userID).Return(domain.TokenPair{}, errors.New("token service down")).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s18", Code: "code-18"})
+		require.Error(t, err)
+		assert.Equal(t, "token service down", err.Error())
 	})
 }

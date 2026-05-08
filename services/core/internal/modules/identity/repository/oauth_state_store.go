@@ -22,6 +22,12 @@ type OAuthStateStore struct {
 	ttl   time.Duration
 }
 
+var (
+	oauthStateNow      = time.Now
+	oauthStateRandRead = rand.Read
+	oauthStateMarshal  = json.Marshal
+)
+
 func NewOAuthStateStore(redisClient *redis.Client, ttl time.Duration) *OAuthStateStore {
 	return &OAuthStateStore{
 		redis: redisClient,
@@ -35,14 +41,14 @@ func (s *OAuthStateStore) Create(ctx context.Context, session domain.OAuthSessio
 		return "", fmt.Errorf("generating oauth state: %w", err)
 	}
 
-	now := time.Now()
+	now := oauthStateNow()
 	session.State = state
 	if session.CreatedAt.IsZero() {
 		session.CreatedAt = now
 	}
 	session.ExpiresAt = now.Add(s.ttl)
 
-	payload, err := json.Marshal(session)
+	payload, err := oauthStateMarshal(session)
 	if err != nil {
 		return "", fmt.Errorf("marshaling oauth session: %w", err)
 	}
@@ -73,7 +79,7 @@ func (s *OAuthStateStore) Consume(ctx context.Context, state string) (domain.OAu
 	if err := json.Unmarshal(raw, &session); err != nil {
 		return domain.OAuthSession{}, fmt.Errorf("unmarshaling oauth session: %w", err)
 	}
-	if session.ExpiresAt.IsZero() || time.Now().After(session.ExpiresAt) {
+	if session.ExpiresAt.IsZero() || oauthStateNow().After(session.ExpiresAt) {
 		return domain.OAuthSession{}, sherrors.ErrUnauthorized
 	}
 
@@ -87,7 +93,7 @@ func oauthStateKey(state string) string {
 
 func randomURLToken(size int) (string, error) {
 	raw := make([]byte, size)
-	if _, err := rand.Read(raw); err != nil {
+	if _, err := oauthStateRandRead(raw); err != nil {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(raw), nil

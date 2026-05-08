@@ -255,6 +255,26 @@ definitions:
     required:
     - password
     type: object
+  internal_modules_identity_handler.OAuthCallbackRequest:
+    properties:
+      code:
+        type: string
+      redirect_uri:
+        type: string
+      state:
+        type: string
+    required:
+    - code
+    - redirect_uri
+    - state
+    type: object
+  internal_modules_identity_handler.OAuthStartResponse:
+    properties:
+      auth_url:
+        type: string
+      state:
+        type: string
+    type: object
   internal_modules_identity_handler.RefreshRequest:
     properties:
       refresh_token:
@@ -496,6 +516,91 @@ paths:
       security:
       - BearerAuth: []
       summary: Logout
+      tags:
+      - auth
+  /auth/oauth/{provider}/callback:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges OAuth code and returns auth tokens
+      parameters:
+      - description: OAuth provider
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: OAuth callback payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_handler.OAuthCallbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Finish OAuth flow
+      tags:
+      - auth
+  /auth/oauth/{provider}/start:
+    get:
+      description: Builds provider auth URL and creates a state token
+      parameters:
+      - description: OAuth provider
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: Redirect URI
+        in: query
+        name: redirect_uri
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.OAuthStartResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Start OAuth flow
       tags:
       - auth
   /auth/refresh:
