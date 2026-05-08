@@ -86,6 +86,23 @@ func TestLogin_Execute(t *testing.T) {
 		assert.True(t, errors.Is(err, sherrors.ErrUnauthorized))
 	})
 
+	t.Run("oauth-only user without password hash → 401 and no verify", func(t *testing.T) {
+		repo := &MockUserRepository{}
+		hasher := &MockPasswordHasher{}
+
+		u := fakeUser()
+		email := *u.Email
+		repo.On("GetByEmail", ctx, email).Return(u, nil)
+		repo.On("GetPasswordHash", ctx, u.ID).Return(nil, nil)
+
+		uc := usecase.NewLogin(repo, hasher, &MockTokenService{})
+		_, err := uc.Execute(ctx, domain.Credentials{Email: &email, Password: "password1"})
+
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, sherrors.ErrUnauthorized))
+		hasher.AssertNotCalled(t, "Verify", mock.Anything, mock.Anything)
+	})
+
 	t.Run("no credentials → 401", func(t *testing.T) {
 		uc := usecase.NewLogin(&MockUserRepository{}, &MockPasswordHasher{}, &MockTokenService{})
 		_, err := uc.Execute(ctx, domain.Credentials{Password: "password1"})

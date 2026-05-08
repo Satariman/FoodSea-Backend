@@ -20,6 +20,11 @@ func (m *MockUserRepository) Create(ctx context.Context, u *domain.User, passwor
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) CreateOAuth(ctx context.Context, u *domain.User) error {
+	args := m.Called(ctx, u)
+	return args.Error(0)
+}
+
 func (m *MockUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
@@ -44,9 +49,16 @@ func (m *MockUserRepository) GetByPhone(ctx context.Context, phone string) (*dom
 	return args.Get(0).(*domain.User), args.Error(1)
 }
 
-func (m *MockUserRepository) GetPasswordHash(ctx context.Context, id uuid.UUID) (string, error) {
+func (m *MockUserRepository) GetPasswordHash(ctx context.Context, id uuid.UUID) (*string, error) {
 	args := m.Called(ctx, id)
-	return args.String(0), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	if hash, ok := args.Get(0).(*string); ok {
+		return hash, args.Error(1)
+	}
+	value := args.String(0)
+	return &value, args.Error(1)
 }
 
 func (m *MockUserRepository) SetOnboardingDone(ctx context.Context, id uuid.UUID) error {
