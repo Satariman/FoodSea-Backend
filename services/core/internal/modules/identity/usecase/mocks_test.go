@@ -54,11 +54,7 @@ func (m *MockUserRepository) GetPasswordHash(ctx context.Context, id uuid.UUID) 
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	if hash, ok := args.Get(0).(*string); ok {
-		return hash, args.Error(1)
-	}
-	value := args.String(0)
-	return &value, args.Error(1)
+	return args.Get(0).(*string), args.Error(1)
 }
 
 func (m *MockUserRepository) SetOnboardingDone(ctx context.Context, id uuid.UUID) error {

@@ -25,7 +25,7 @@ func TestLogin_Execute(t *testing.T) {
 		u := fakeUser()
 		email := *u.Email
 		repo.On("GetByEmail", ctx, email).Return(u, nil)
-		repo.On("GetPasswordHash", ctx, u.ID).Return("$hashed", nil)
+		repo.On("GetPasswordHash", ctx, u.ID).Return(ptr("$hashed"), nil)
 		hasher.On("Verify", "$hashed", "password1").Return(nil)
 		tokens.On("IssuePair", ctx, u.ID).Return(fakePair(), nil)
 
@@ -45,7 +45,7 @@ func TestLogin_Execute(t *testing.T) {
 		phone := "+79001234567"
 		u := &domain.User{ID: fakeUser().ID, Phone: &phone}
 		repo.On("GetByPhone", ctx, phone).Return(u, nil)
-		repo.On("GetPasswordHash", ctx, u.ID).Return("$hashed", nil)
+		repo.On("GetPasswordHash", ctx, u.ID).Return(ptr("$hashed"), nil)
 		hasher.On("Verify", "$hashed", "pass1234").Return(nil)
 		tokens.On("IssuePair", ctx, u.ID).Return(fakePair(), nil)
 
@@ -76,7 +76,7 @@ func TestLogin_Execute(t *testing.T) {
 		u := fakeUser()
 		email := *u.Email
 		repo.On("GetByEmail", ctx, email).Return(u, nil)
-		repo.On("GetPasswordHash", ctx, u.ID).Return("$hashed", nil)
+		repo.On("GetPasswordHash", ctx, u.ID).Return(ptr("$hashed"), nil)
 		hasher.On("Verify", "$hashed", "wrongpass").Return(errors.New("mismatch"))
 
 		uc := usecase.NewLogin(repo, hasher, &MockTokenService{})
@@ -103,6 +103,24 @@ func TestLogin_Execute(t *testing.T) {
 		hasher.AssertNotCalled(t, "Verify", mock.Anything, mock.Anything)
 	})
 
+	t.Run("user with empty password hash pointer → 401 and no verify", func(t *testing.T) {
+		repo := &MockUserRepository{}
+		hasher := &MockPasswordHasher{}
+
+		u := fakeUser()
+		email := *u.Email
+		emptyHash := ""
+		repo.On("GetByEmail", ctx, email).Return(u, nil)
+		repo.On("GetPasswordHash", ctx, u.ID).Return(&emptyHash, nil)
+
+		uc := usecase.NewLogin(repo, hasher, &MockTokenService{})
+		_, err := uc.Execute(ctx, domain.Credentials{Email: &email, Password: "password1"})
+
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, sherrors.ErrUnauthorized))
+		hasher.AssertNotCalled(t, "Verify", mock.Anything, mock.Anything)
+	})
+
 	t.Run("no credentials → 401", func(t *testing.T) {
 		uc := usecase.NewLogin(&MockUserRepository{}, &MockPasswordHasher{}, &MockTokenService{})
 		_, err := uc.Execute(ctx, domain.Credentials{Password: "password1"})
@@ -119,7 +137,7 @@ func TestLogin_Execute(t *testing.T) {
 		u := fakeUser()
 		email := *u.Email
 		repo.On("GetByEmail", ctx, email).Return(u, nil)
-		repo.On("GetPasswordHash", ctx, u.ID).Return("$hashed", nil)
+		repo.On("GetPasswordHash", ctx, u.ID).Return(ptr("$hashed"), nil)
 		hasher.On("Verify", "$hashed", "password1").Return(nil)
 		tokens.On("IssuePair", ctx, u.ID).Return(domain.TokenPair{}, errors.New("redis down"))
 
@@ -138,7 +156,7 @@ func TestLogin_Execute(t *testing.T) {
 		u := fakeUser()
 		email := *u.Email
 		repo.On("GetByEmail", ctx, email).Return(u, nil)
-		repo.On("GetPasswordHash", ctx, mock.Anything).Return("$hashed", nil)
+		repo.On("GetPasswordHash", ctx, mock.Anything).Return(ptr("$hashed"), nil)
 		hasher.On("Verify", "$hashed", "password1").Return(nil)
 		tokens.On("IssuePair", ctx, mock.Anything).Return(fakePair(), nil)
 
