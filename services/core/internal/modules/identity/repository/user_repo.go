@@ -21,6 +21,10 @@ func NewUserRepo(client *ent.Client) *UserRepo {
 }
 
 func (r *UserRepo) Create(ctx context.Context, u *domain.User, passwordHash string) error {
+	if passwordHash == "" {
+		return fmt.Errorf("creating user: %w", sherrors.ErrInvalidInput)
+	}
+
 	created, err := r.client.User.Create().
 		SetID(u.ID).
 		SetPasswordHash(passwordHash).

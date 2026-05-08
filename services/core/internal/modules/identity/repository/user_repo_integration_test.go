@@ -126,6 +126,14 @@ func TestUserRepo_Integration(t *testing.T) {
 		assert.Nil(t, hash)
 	})
 
+	t.Run("create regular user with empty password hash returns invalid input", func(t *testing.T) {
+		email := "emptyhash_" + uuid.NewString()[:8] + "@example.com"
+		u := &domain.User{ID: uuid.New(), Email: &email}
+
+		err := repo.Create(ctx, u, "")
+		assert.ErrorIs(t, err, sherrors.ErrInvalidInput)
+	})
+
 	t.Run("set onboarding done — idempotent", func(t *testing.T) {
 		email := "onb_" + uuid.NewString()[:8] + "@example.com"
 		u := &domain.User{ID: uuid.New(), Email: &email}
@@ -170,15 +178,21 @@ func TestUserRepo_Integration(t *testing.T) {
 		}
 		wg.Wait()
 
-		var errs, nils int
+		var (
+			errs, nils int
+			failedErr  error
+		)
 		for _, err := range results {
 			if err == nil {
 				nils++
 			} else {
 				errs++
+				failedErr = err
 			}
 		}
 		assert.Equal(t, 1, nils, "exactly one registration should succeed")
 		assert.Equal(t, 1, errs, "exactly one registration should fail")
+		require.Error(t, failedErr)
+		assert.ErrorIs(t, failedErr, sherrors.ErrAlreadyExists)
 	})
 }
