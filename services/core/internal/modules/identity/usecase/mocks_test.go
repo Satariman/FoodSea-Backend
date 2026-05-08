@@ -102,6 +102,66 @@ func (m *MockTokenService) Revoke(ctx context.Context, userID uuid.UUID) error {
 	return args.Error(0)
 }
 
+type MockOAuthStateStore struct {
+	mock.Mock
+}
+
+func (m *MockOAuthStateStore) Create(ctx context.Context, session domain.OAuthSession) (string, error) {
+	args := m.Called(ctx, session)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockOAuthStateStore) Consume(ctx context.Context, state string) (domain.OAuthSession, error) {
+	args := m.Called(ctx, state)
+	if args.Get(0) == nil {
+		return domain.OAuthSession{}, args.Error(1)
+	}
+	return args.Get(0).(domain.OAuthSession), args.Error(1)
+}
+
+type MockOAuthProvider struct {
+	mock.Mock
+}
+
+func (m *MockOAuthProvider) Name() domain.OAuthProviderKind {
+	args := m.Called()
+	return args.Get(0).(domain.OAuthProviderKind)
+}
+
+func (m *MockOAuthProvider) AuthURL(state string) (string, error) {
+	args := m.Called(state)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockOAuthProvider) Exchange(ctx context.Context, code string) (domain.OAuthProviderProfile, error) {
+	args := m.Called(ctx, code)
+	if args.Get(0) == nil {
+		return domain.OAuthProviderProfile{}, args.Error(1)
+	}
+	return args.Get(0).(domain.OAuthProviderProfile), args.Error(1)
+}
+
+type MockOAuthIdentityRepository struct {
+	mock.Mock
+}
+
+func (m *MockOAuthIdentityRepository) GetByProviderUserID(
+	ctx context.Context,
+	provider domain.OAuthProviderKind,
+	providerUserID string,
+) (*domain.OAuthIdentity, error) {
+	args := m.Called(ctx, provider, providerUserID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.OAuthIdentity), args.Error(1)
+}
+
+func (m *MockOAuthIdentityRepository) Create(ctx context.Context, identity *domain.OAuthIdentity) error {
+	args := m.Called(ctx, identity)
+	return args.Error(0)
+}
+
 // helpers
 
 func ptr(s string) *string { return &s }
