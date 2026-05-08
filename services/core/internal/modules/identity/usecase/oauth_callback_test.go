@@ -26,7 +26,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		tokens *MockTokenService,
 	) *usecase.OAuthCallback {
 		provider.On("Name").Return(domain.OAuthProviderGoogle).Once()
-		return usecase.NewOAuthCallback(states, []usecase.OAuthProvider{provider}, identities, users, tokens)
+		return usecase.NewOAuthCallback(states, []domain.OAuthProvider{provider}, identities, users, tokens)
 	}
 
 	t.Run("callback existing identity success", func(t *testing.T) {
@@ -45,7 +45,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 			Provider:   domain.OAuthProviderGoogle,
 			RedirectTo: "/cb",
 		}, nil).Once()
-		provider.On("Exchange", ctx, "code-1").Return(domain.OAuthProviderProfile{
+		provider.On("Exchange", ctx, "code-1", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
 			Provider:       domain.OAuthProviderGoogle,
 			ProviderUserID: "sub-1",
 			Email:          ptr("u@example.com"),
@@ -77,7 +80,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		u := &domain.User{ID: userID, Email: &email}
 
 		states.On("Consume", ctx, "s2").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
-		provider.On("Exchange", ctx, "code-2").Return(domain.OAuthProviderProfile{
+		provider.On("Exchange", ctx, "code-2", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
 			Provider:       domain.OAuthProviderGoogle,
 			ProviderUserID: "sub-2",
 			Email:          &email,
@@ -106,7 +112,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		createdUser := &domain.User{ID: uuid.New(), Email: &email}
 
 		states.On("Consume", ctx, "s3").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
-		provider.On("Exchange", ctx, "code-3").Return(domain.OAuthProviderProfile{
+		provider.On("Exchange", ctx, "code-3", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
 			Provider:       domain.OAuthProviderGoogle,
 			ProviderUserID: "sub-3",
 			Email:          &email,
@@ -137,7 +146,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		uc := newUC(states, provider, identities, users, tokens)
 
 		states.On("Consume", ctx, "s4").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
-		provider.On("Exchange", ctx, "code-4").Return(domain.OAuthProviderProfile{
+		provider.On("Exchange", ctx, "code-4", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
 			Provider:       domain.OAuthProviderGoogle,
 			ProviderUserID: "sub-4",
 			Email:          nil,
@@ -189,7 +201,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 
 		uc := newUC(states, provider, identities, users, tokens)
 		states.On("Consume", ctx, "s6").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
-		provider.On("Exchange", ctx, "bad-code").Return(domain.OAuthProviderProfile{}, sherrors.ErrUnauthorized).Once()
+		provider.On("Exchange", ctx, "bad-code", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{}, sherrors.ErrUnauthorized).Once()
 
 		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s6", Code: "bad-code"})
 		assert.ErrorIs(t, err, sherrors.ErrUnauthorized)
@@ -210,7 +225,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 
 		uc := newUC(states, provider, identities, users, tokens)
 		states.On("Consume", ctx, "s7").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
-		provider.On("Exchange", ctx, "code-7").Return(domain.OAuthProviderProfile{
+		provider.On("Exchange", ctx, "code-7", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
 			Provider:       domain.OAuthProviderGoogle,
 			ProviderUserID: "sub-7",
 			Email:          ptr("x@example.com"),
@@ -237,7 +255,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		linkedIdentity := &domain.OAuthIdentity{ID: uuid.New(), UserID: userID, Provider: domain.OAuthProviderGoogle, ProviderUserID: "sub-race"}
 
 		states.On("Consume", ctx, "s8").Return(domain.OAuthSession{Provider: domain.OAuthProviderGoogle, RedirectTo: "/cb"}, nil).Once()
-		provider.On("Exchange", ctx, "code-8").Return(domain.OAuthProviderProfile{
+		provider.On("Exchange", ctx, "code-8", domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+		}).Return(domain.OAuthProviderProfile{
 			Provider:       domain.OAuthProviderGoogle,
 			ProviderUserID: "sub-race",
 			Email:          &email,

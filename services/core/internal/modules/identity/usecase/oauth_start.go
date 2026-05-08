@@ -14,26 +14,20 @@ type OAuthStateStore interface {
 	Consume(ctx context.Context, state string) (domain.OAuthSession, error)
 }
 
-type OAuthProvider interface {
-	Name() domain.OAuthProviderKind
-	AuthURL(state string) (string, error)
-	Exchange(ctx context.Context, code string) (domain.OAuthProviderProfile, error)
-}
-
 type OAuthStart struct {
 	states             OAuthStateStore
-	providers          map[domain.OAuthProviderKind]OAuthProvider
+	providers          map[domain.OAuthProviderKind]domain.OAuthProvider
 	allowedRedirectURI map[string]struct{}
 	stateTTL           time.Duration
 }
 
 func NewOAuthStart(
 	states OAuthStateStore,
-	providers []OAuthProvider,
+	providers []domain.OAuthProvider,
 	allowedRedirectURIs []string,
 	stateTTL time.Duration,
 ) *OAuthStart {
-	providersMap := make(map[domain.OAuthProviderKind]OAuthProvider, len(providers))
+	providersMap := make(map[domain.OAuthProviderKind]domain.OAuthProvider, len(providers))
 	for _, provider := range providers {
 		providersMap[provider.Name()] = provider
 	}
@@ -74,7 +68,7 @@ func (o *OAuthStart) Execute(ctx context.Context, req domain.OAuthStartRequest) 
 		return domain.OAuthStartResult{}, err
 	}
 
-	authURL, err := provider.AuthURL(state)
+	authURL, err := provider.AuthURL(ctx, state, session)
 	if err != nil {
 		return domain.OAuthStartResult{}, err
 	}

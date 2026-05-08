@@ -2,11 +2,13 @@ package identity
 
 import (
 	"log/slog"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/foodsea/core/ent"
+	"github.com/foodsea/core/internal/modules/identity/domain"
 	"github.com/foodsea/core/internal/modules/identity/handler"
 	"github.com/foodsea/core/internal/modules/identity/repository"
 	"github.com/foodsea/core/internal/modules/identity/usecase"
@@ -20,6 +22,9 @@ type Deps struct {
 	Cache cache.Cache
 	Log   *slog.Logger
 	JWT   config.JWTConfig
+	OAuth config.OAuthConfig
+
+	HTTPClient *http.Client
 }
 
 type Module struct {
@@ -34,7 +39,14 @@ type Module struct {
 }
 
 func NewModule(deps Deps) *Module {
+	httpClient := deps.HTTPClient
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+
 	userRepo := repository.NewUserRepo(deps.Ent)
+	oauthIdentityRepo := repository.NewOAuthIdentityRepo(deps.Ent)
+	stateStore := repository.NewOAuthStateStore(deps.Redis, deps.OAuth.StateTTL)
 	hasher := repository.NewBcryptHasher()
 	tokenSvc := repository.NewJWTTokenService(
 		deps.JWT.Secret,
@@ -42,15 +54,24 @@ func NewModule(deps Deps) *Module {
 		deps.JWT.RefreshTTL,
 		deps.Redis,
 	)
+	providers := make([]domain.OAuthProvider, 0, 2)
+	if deps.OAuth.Google.Enabled {
+		providers = append(providers, repository.NewGoogleOAuthProvider(deps.OAuth.Google, httpClient))
+	}
+	if deps.OAuth.Yandex.Enabled {
+		providers = append(providers, repository.NewYandexOAuthProvider(deps.OAuth.Yandex, httpClient))
+	}
 
 	reg := usecase.NewRegister(userRepo, hasher, tokenSvc)
 	loginUC := usecase.NewLogin(userRepo, hasher, tokenSvc)
 	refUC := usecase.NewRefresh(tokenSvc)
 	outUC := usecase.NewLogout(tokenSvc)
+	oauthStartUC := usecase.NewOAuthStart(stateStore, providers, deps.OAuth.AllowedRedirectURIs, deps.OAuth.StateTTL)
+	oauthCallbackUC := usecase.NewOAuthCallback(stateStore, providers, oauthIdentityRepo, userRepo, tokenSvc)
 	profUC := usecase.NewGetProfile(userRepo)
 	onbUC := usecase.NewCompleteOnboarding(userRepo)
 
-	authH := handler.NewAuthHandler(reg, loginUC, refUC, outUC, nil, nil)
+	authH := handler.NewAuthHandler(reg, loginUC, refUC, outUC, oauthStartUC, oauthCallbackUC)
 	userH := handler.NewUserHandler(profUC, onbUC)
 
 	return &Module{

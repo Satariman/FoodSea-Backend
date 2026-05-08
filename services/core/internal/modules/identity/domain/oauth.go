@@ -93,9 +93,9 @@ type OAuthStateStore interface {
 }
 
 type OAuthProvider interface {
-	Provider() OAuthProviderKind
-	BuildAuthURL(state string) (string, error)
-	ExchangeCode(ctx context.Context, code string) (OAuthProviderProfile, error)
+	Name() OAuthProviderKind
+	AuthURL(ctx context.Context, state string, session OAuthSession) (string, error)
+	Exchange(ctx context.Context, code string, session OAuthSession) (OAuthProviderProfile, error)
 }
 
 type OAuthIdentityRepository interface {

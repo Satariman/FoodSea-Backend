@@ -128,13 +128,13 @@ func (m *MockOAuthProvider) Name() domain.OAuthProviderKind {
 	return args.Get(0).(domain.OAuthProviderKind)
 }
 
-func (m *MockOAuthProvider) AuthURL(state string) (string, error) {
-	args := m.Called(state)
+func (m *MockOAuthProvider) AuthURL(ctx context.Context, state string, session domain.OAuthSession) (string, error) {
+	args := m.Called(ctx, state, session)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockOAuthProvider) Exchange(ctx context.Context, code string) (domain.OAuthProviderProfile, error) {
-	args := m.Called(ctx, code)
+func (m *MockOAuthProvider) Exchange(ctx context.Context, code string, session domain.OAuthSession) (domain.OAuthProviderProfile, error) {
+	args := m.Called(ctx, code, session)
 	if args.Get(0) == nil {
 		return domain.OAuthProviderProfile{}, args.Error(1)
 	}

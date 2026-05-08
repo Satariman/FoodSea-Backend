@@ -24,11 +24,13 @@ func TestOAuthStart_Execute(t *testing.T) {
 		provider := new(MockOAuthProvider)
 		provider.On("Name").Return(domain.OAuthProviderGoogle).Once()
 
-		uc := usecase.NewOAuthStart(states, []usecase.OAuthProvider{provider}, []string{"/cb"}, stateTTL)
+		uc := usecase.NewOAuthStart(states, []domain.OAuthProvider{provider}, []string{"/cb"}, stateTTL)
 		states.On("Create", ctx, mock.MatchedBy(func(s domain.OAuthSession) bool {
 			return s.Provider == domain.OAuthProviderGoogle && s.RedirectTo == "/cb"
 		})).Return("state-123", nil).Once()
-		provider.On("AuthURL", "state-123").Return("https://oauth.example/auth?state=state-123", nil).Once()
+		provider.On("AuthURL", ctx, "state-123", mock.MatchedBy(func(s domain.OAuthSession) bool {
+			return s.Provider == domain.OAuthProviderGoogle && s.RedirectTo == "/cb"
+		})).Return("https://oauth.example/auth?state=state-123", nil).Once()
 
 		result, err := uc.Execute(ctx, domain.OAuthStartRequest{
 			Provider:   domain.OAuthProviderGoogle,
@@ -44,7 +46,7 @@ func TestOAuthStart_Execute(t *testing.T) {
 		provider := new(MockOAuthProvider)
 		provider.On("Name").Return(domain.OAuthProviderGoogle).Once()
 
-		uc := usecase.NewOAuthStart(states, []usecase.OAuthProvider{provider}, []string{"/cb"}, stateTTL)
+		uc := usecase.NewOAuthStart(states, []domain.OAuthProvider{provider}, []string{"/cb"}, stateTTL)
 
 		_, err := uc.Execute(ctx, domain.OAuthStartRequest{
 			Provider:   domain.OAuthProviderGoogle,
@@ -68,10 +70,10 @@ func TestOAuthStart_Execute(t *testing.T) {
 		provider := new(MockOAuthProvider)
 		provider.On("Name").Return(domain.OAuthProviderApple).Once()
 
-		uc := usecase.NewOAuthStart(states, []usecase.OAuthProvider{provider}, []string{"/cb"}, stateTTL)
+		uc := usecase.NewOAuthStart(states, []domain.OAuthProvider{provider}, []string{"/cb"}, stateTTL)
 
 		states.On("Create", ctx, mock.Anything).Return("state-1", nil).Once()
-		provider.On("AuthURL", "state-1").Return("", errors.New("provider down")).Once()
+		provider.On("AuthURL", ctx, "state-1", mock.Anything).Return("", errors.New("provider down")).Once()
 
 		_, err := uc.Execute(ctx, domain.OAuthStartRequest{
 			Provider:   domain.OAuthProviderApple,

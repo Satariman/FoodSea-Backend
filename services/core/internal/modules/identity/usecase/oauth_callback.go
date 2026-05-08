@@ -14,7 +14,7 @@ import (
 
 type OAuthCallback struct {
 	states     OAuthStateStore
-	providers  map[domain.OAuthProviderKind]OAuthProvider
+	providers  map[domain.OAuthProviderKind]domain.OAuthProvider
 	identities domain.OAuthIdentityRepository
 	users      domain.UserRepository
 	tokens     domain.TokenService
@@ -22,12 +22,12 @@ type OAuthCallback struct {
 
 func NewOAuthCallback(
 	states OAuthStateStore,
-	providers []OAuthProvider,
+	providers []domain.OAuthProvider,
 	identities domain.OAuthIdentityRepository,
 	users domain.UserRepository,
 	tokens domain.TokenService,
 ) *OAuthCallback {
-	providersMap := make(map[domain.OAuthProviderKind]OAuthProvider, len(providers))
+	providersMap := make(map[domain.OAuthProviderKind]domain.OAuthProvider, len(providers))
 	for _, provider := range providers {
 		providersMap[provider.Name()] = provider
 	}
@@ -62,7 +62,7 @@ func (o *OAuthCallback) Execute(ctx context.Context, req domain.OAuthCallbackReq
 		return domain.OAuthCallbackResult{}, sherrors.ErrUnauthorized
 	}
 
-	profile, err := provider.Exchange(ctx, req.Code)
+	profile, err := provider.Exchange(ctx, req.Code, session)
 	if err != nil {
 		if errors.Is(err, sherrors.ErrUnauthorized) {
 			return domain.OAuthCallbackResult{}, sherrors.ErrUnauthorized
