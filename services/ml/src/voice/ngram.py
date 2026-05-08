@@ -21,6 +21,9 @@ class Segment:
     words: list[str] = field(default_factory=list)
 
 
+_CONJUNCTION_STOPWORDS: frozenset[str] = frozenset({"и", "а", "плюс"})
+
+
 def build_segments(tokens: list[Token]) -> list[Segment]:
     segments: list[Segment] = []
     current_quantity: int | float = 1
@@ -49,6 +52,11 @@ def build_segments(tokens: list[Token]) -> list[Segment]:
         elif token.kind == TokenKind.WORD:
             current_words.append(token.text)
         elif token.kind == TokenKind.STOPWORD:
+            if token.text in _CONJUNCTION_STOPWORDS and current_quantity != 1:
+                flush()
+                current_quantity = 1
+                current_unit = None
+                current_words = []
             continue
     flush()
 

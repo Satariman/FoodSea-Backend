@@ -1,0 +1,32 @@
+[
+  {
+    "name": "continuous speech, no separators",
+    "input": "молоко простоквашино сыр российский бананы филе куриное огурцы",
+    "expected_product_ids": ["mp", "sr", "bn", "fk", "og"],
+    "expected_quantities": [1, 1, 1, 1, 1]
+  },
+  {
+    "name": "with quantities",
+    "input": "два молока пять огурцов и батон",
+    "expected_product_ids": ["mp", "og", "bt"],
+    "expected_quantities": [2, 5, 1]
+  },
+  {
+    "name": "with units",
+    "input": "три литра молока полтора кило яблок",
+    "expected_product_ids": ["mp", "ya"],
+    "expected_quantities": [3, 1]
+  },
+  {
+    "name": "garbage text",
+    "input": "погода ужасная",
+    "expected_product_ids": [],
+    "expected_quantities": []
+  },
+  {
+    "name": "mixed garbage and products",
+    "input": "молоко погода ужасная батон",
+    "expected_product_ids": ["mp", "bt"],
+    "expected_quantities": [1, 1]
+  }
+]
