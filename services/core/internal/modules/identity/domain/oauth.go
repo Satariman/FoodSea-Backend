@@ -35,6 +35,10 @@ func ParseOAuthProvider(raw string) (OAuthProviderKind, error) {
 	}
 }
 
+func ParseOAuthProviderName(raw string) (OAuthProviderKind, error) {
+	return ParseOAuthProvider(raw)
+}
+
 type OAuthSession struct {
 	State      string
 	Provider   OAuthProviderKind

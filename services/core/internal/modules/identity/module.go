@@ -50,7 +50,7 @@ func NewModule(deps Deps) *Module {
 	profUC := usecase.NewGetProfile(userRepo)
 	onbUC := usecase.NewCompleteOnboarding(userRepo)
 
-	authH := handler.NewAuthHandler(reg, loginUC, refUC, outUC)
+	authH := handler.NewAuthHandler(reg, loginUC, refUC, outUC, nil, nil)
 	userH := handler.NewUserHandler(profUC, onbUC)
 
 	return &Module{
@@ -73,6 +73,8 @@ func (m *Module) RegisterRoutes(public, protected *gin.RouterGroup) {
 	auth.POST("/register", m.authHandler.Register)
 	auth.POST("/login", m.authHandler.Login)
 	auth.POST("/refresh", m.authHandler.Refresh)
+	auth.GET("/oauth/:provider/start", m.authHandler.OAuthStart)
+	auth.POST("/oauth/:provider/callback", m.authHandler.OAuthCallback)
 
 	protected.POST("/auth/logout", m.authHandler.Logout)
 

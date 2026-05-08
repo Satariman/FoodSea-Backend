@@ -29,11 +29,21 @@ type logoutUseCase interface {
 	Execute(ctx context.Context, userID uuid.UUID) error
 }
 
+type oauthStartUseCase interface {
+	Execute(ctx context.Context, req domain.OAuthStartRequest) (domain.OAuthStartResult, error)
+}
+
+type oauthCallbackUseCase interface {
+	Execute(ctx context.Context, req domain.OAuthCallbackRequest) (domain.OAuthCallbackResult, error)
+}
+
 type AuthHandler struct {
-	register registerUseCase
-	login    loginUseCase
-	refresh  refreshUseCase
-	logout   logoutUseCase
+	register      registerUseCase
+	login         loginUseCase
+	refresh       refreshUseCase
+	logout        logoutUseCase
+	oauthStart    oauthStartUseCase
+	oauthCallback oauthCallbackUseCase
 }
 
 func NewAuthHandler(
@@ -41,12 +51,16 @@ func NewAuthHandler(
 	login loginUseCase,
 	refresh refreshUseCase,
 	logout logoutUseCase,
+	oauthStart oauthStartUseCase,
+	oauthCallback oauthCallbackUseCase,
 ) *AuthHandler {
 	return &AuthHandler{
-		register: register,
-		login:    login,
-		refresh:  refresh,
-		logout:   logout,
+		register:      register,
+		login:         login,
+		refresh:       refresh,
+		logout:        logout,
+		oauthStart:    oauthStart,
+		oauthCallback: oauthCallback,
 	}
 }
 
@@ -165,4 +179,78 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	httputil.NoContent(c)
+}
+
+// OAuthStart godoc
+// @Summary      Start OAuth flow
+// @Description  Builds provider auth URL and creates a state token
+// @Tags         auth
+// @Produce      json
+// @Param        provider path string true "OAuth provider"
+// @Param        redirect_uri query string true "Redirect URI"
+// @Success      200 {object} httputil.Response{data=OAuthStartResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/{provider}/start [get]
+func (h *AuthHandler) OAuthStart(c *gin.Context) {
+	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	redirectURI := c.Query("redirect_uri")
+	result, err := h.oauthStart.Execute(c.Request.Context(), domain.OAuthStartRequest{
+		Provider:   provider,
+		RedirectTo: redirectURI,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, OAuthStartResponse{
+		AuthURL: result.AuthURL,
+		State:   result.State,
+	})
+}
+
+// OAuthCallback godoc
+// @Summary      Finish OAuth flow
+// @Description  Exchanges OAuth code and returns auth tokens
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        provider path string true "OAuth provider"
+// @Param        body body OAuthCallbackRequest true "OAuth callback payload"
+// @Success      200 {object} httputil.Response{data=AuthResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      401 {object} httputil.Response
+// @Failure      409 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/{provider}/callback [post]
+func (h *AuthHandler) OAuthCallback(c *gin.Context) {
+	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	var req OAuthCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httputil.BadRequest(c, err.Error())
+		return
+	}
+
+	result, err := h.oauthCallback.Execute(c.Request.Context(), domain.OAuthCallbackRequest{
+		Provider: provider,
+		State:    req.State,
+		Code:     req.Code,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, toAuthResponse(result.User, result.TokenPair))
 }

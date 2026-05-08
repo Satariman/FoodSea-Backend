@@ -57,6 +57,26 @@ func (m *mockLogout) Execute(ctx context.Context, userID uuid.UUID) error {
 	return args.Error(0)
 }
 
+type mockOAuthStart struct{ mock.Mock }
+
+func (m *mockOAuthStart) Execute(ctx context.Context, req domain.OAuthStartRequest) (domain.OAuthStartResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return domain.OAuthStartResult{}, args.Error(1)
+	}
+	return args.Get(0).(domain.OAuthStartResult), args.Error(1)
+}
+
+type mockOAuthCallback struct{ mock.Mock }
+
+func (m *mockOAuthCallback) Execute(ctx context.Context, req domain.OAuthCallbackRequest) (domain.OAuthCallbackResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return domain.OAuthCallbackResult{}, args.Error(1)
+	}
+	return args.Get(0).(domain.OAuthCallbackResult), args.Error(1)
+}
+
 // helpers
 
 func testPair() domain.TokenPair {
@@ -78,6 +98,8 @@ func setupAuthRouter(h *AuthHandler) *gin.Engine {
 	r.POST("/auth/register", h.Register)
 	r.POST("/auth/login", h.Login)
 	r.POST("/auth/refresh", h.Refresh)
+	r.GET("/auth/oauth/:provider/start", h.OAuthStart)
+	r.POST("/auth/oauth/:provider/callback", h.OAuthCallback)
 	r.POST("/auth/logout", middleware.Auth("test-secret"), h.Logout)
 	return r
 }
@@ -102,7 +124,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		pair := testPair()
 		reg.On("Execute", mock.Anything, mock.Anything).Return(usecase.RegisterResult{User: u, TokenPair: pair}, nil)
 
-		h := NewAuthHandler(reg, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(reg, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/register", map[string]any{
 			"email": "test@example.com", "password": "password1",
 		})
@@ -114,13 +136,13 @@ func TestAuthHandler_Register(t *testing.T) {
 	})
 
 	t.Run("missing password → 400", func(t *testing.T) {
-		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/register", map[string]any{"email": "x@x.com"})
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("invalid JSON → 400", func(t *testing.T) {
-		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader([]byte("bad json")))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
@@ -132,7 +154,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		reg := &mockRegister{}
 		reg.On("Execute", mock.Anything, mock.Anything).Return(usecase.RegisterResult{}, sherrors.ErrAlreadyExists)
 
-		h := NewAuthHandler(reg, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(reg, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/register", map[string]any{
 			"email": "dup@example.com", "password": "password1",
 		})
@@ -143,7 +165,7 @@ func TestAuthHandler_Register(t *testing.T) {
 		reg := &mockRegister{}
 		reg.On("Execute", mock.Anything, mock.Anything).Return(usecase.RegisterResult{}, sherrors.ErrInvalidInput)
 
-		h := NewAuthHandler(reg, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(reg, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/register", map[string]any{
 			"email": "ok@example.com", "password": "password1",
 		})
@@ -158,7 +180,7 @@ func TestAuthHandler_Login(t *testing.T) {
 		pair := testPair()
 		loginUC.On("Execute", mock.Anything, mock.Anything).Return(usecase.LoginResult{User: u, TokenPair: pair}, nil)
 
-		h := NewAuthHandler(&mockRegister{}, loginUC, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, loginUC, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/login", map[string]any{
 			"email": "test@example.com", "password": "password1",
 		})
@@ -169,7 +191,7 @@ func TestAuthHandler_Login(t *testing.T) {
 		loginUC := &mockLogin{}
 		loginUC.On("Execute", mock.Anything, mock.Anything).Return(usecase.LoginResult{}, sherrors.ErrUnauthorized)
 
-		h := NewAuthHandler(&mockRegister{}, loginUC, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, loginUC, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/login", map[string]any{
 			"email": "x@x.com", "password": "wrongpass",
 		})
@@ -177,7 +199,7 @@ func TestAuthHandler_Login(t *testing.T) {
 	})
 
 	t.Run("missing password → 400", func(t *testing.T) {
-		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/login", map[string]any{"email": "x@x.com"})
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -188,7 +210,7 @@ func TestAuthHandler_Refresh(t *testing.T) {
 		refUC := &mockRefresh{}
 		refUC.On("Execute", mock.Anything, "my-refresh-token").Return(testPair(), nil)
 
-		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, refUC, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, refUC, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/refresh", map[string]any{"refresh_token": "my-refresh-token"})
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -198,14 +220,14 @@ func TestAuthHandler_Refresh(t *testing.T) {
 		refUC := &mockRefresh{}
 		refUC.On("Execute", mock.Anything, "bad-token").Return(domain.TokenPair{}, sherrors.ErrUnauthorized)
 
-		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, refUC, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, refUC, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/refresh", map[string]any{"refresh_token": "bad-token"})
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 
 	t.Run("missing refresh_token → 400", func(t *testing.T) {
-		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		w := postJSON(t, setupAuthRouter(h), "/auth/refresh", map[string]any{})
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -213,10 +235,113 @@ func TestAuthHandler_Refresh(t *testing.T) {
 
 func TestAuthHandler_Logout(t *testing.T) {
 	t.Run("no auth header → 401", func(t *testing.T) {
-		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{})
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
 		req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
 		w := httptest.NewRecorder()
 		setupAuthRouter(h).ServeHTTP(w, req)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+func TestAuthHandler_OAuthStart(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		oauthStart := &mockOAuthStart{}
+		oauthStart.On("Execute", mock.Anything, domain.OAuthStartRequest{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "https://app/cb",
+		}).Return(domain.OAuthStartResult{
+			AuthURL: "https://accounts.google.com/auth?state=s1",
+			State:   "s1",
+		}, nil)
+
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, oauthStart, &mockOAuthCallback{})
+		req := httptest.NewRequest(http.MethodGet, "/auth/oauth/google/start?redirect_uri=https://app/cb", nil)
+		w := httptest.NewRecorder()
+		setupAuthRouter(h).ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("bad provider => 400", func(t *testing.T) {
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
+		req := httptest.NewRequest(http.MethodGet, "/auth/oauth/invalid/start?redirect_uri=https://app/cb", nil)
+		w := httptest.NewRecorder()
+		setupAuthRouter(h).ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("start usecase invalid input => 400", func(t *testing.T) {
+		oauthStart := &mockOAuthStart{}
+		oauthStart.On("Execute", mock.Anything, mock.Anything).Return(domain.OAuthStartResult{}, sherrors.ErrInvalidInput)
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, oauthStart, &mockOAuthCallback{})
+		req := httptest.NewRequest(http.MethodGet, "/auth/oauth/google/start?redirect_uri=bad", nil)
+		w := httptest.NewRecorder()
+		setupAuthRouter(h).ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+func TestAuthHandler_OAuthCallback(t *testing.T) {
+	t.Run("callback success => 200", func(t *testing.T) {
+		oauthCallback := &mockOAuthCallback{}
+		u := testUser()
+		pair := testPair()
+		oauthCallback.On("Execute", mock.Anything, domain.OAuthCallbackRequest{
+			Provider: domain.OAuthProviderGoogle,
+			Code:     "code-1",
+			State:    "state-1",
+		}).Return(domain.OAuthCallbackResult{
+			User:      u,
+			TokenPair: pair,
+		}, nil)
+
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, oauthCallback)
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/google/callback", map[string]any{
+			"code":         "code-1",
+			"state":        "state-1",
+			"redirect_uri": "https://app/cb",
+		})
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("callback bad provider => 400", func(t *testing.T) {
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/notreal/callback", map[string]any{
+			"code":         "code-1",
+			"state":        "state-1",
+			"redirect_uri": "https://app/cb",
+		})
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("callback missing fields => 400", func(t *testing.T) {
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/google/callback", map[string]any{
+			"code": "code-1",
+		})
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("callback conflict => 409", func(t *testing.T) {
+		oauthCallback := &mockOAuthCallback{}
+		oauthCallback.On("Execute", mock.Anything, mock.Anything).Return(domain.OAuthCallbackResult{}, sherrors.ErrConflict)
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, oauthCallback)
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/google/callback", map[string]any{
+			"code":         "code-1",
+			"state":        "state-1",
+			"redirect_uri": "https://app/cb",
+		})
+		assert.Equal(t, http.StatusConflict, w.Code)
+	})
+
+	t.Run("callback unauthorized => 401", func(t *testing.T) {
+		oauthCallback := &mockOAuthCallback{}
+		oauthCallback.On("Execute", mock.Anything, mock.Anything).Return(domain.OAuthCallbackResult{}, sherrors.ErrUnauthorized)
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, oauthCallback)
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/google/callback", map[string]any{
+			"code":         "code-1",
+			"state":        "state-1",
+			"redirect_uri": "https://app/cb",
+		})
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 }
