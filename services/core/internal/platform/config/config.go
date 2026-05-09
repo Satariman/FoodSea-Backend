@@ -154,7 +154,7 @@ func Load() (*Config, error) {
 				AuthURL:     "https://oauth.yandex.ru/authorize",
 				TokenURL:    "https://oauth.yandex.ru/token",
 				UserInfoURL: "https://login.yandex.ru/info",
-				Scopes:      []string{"login:email", "login:info"},
+				Scopes:      []string{"login:email", "login:avatar"},
 			}),
 		},
 	}

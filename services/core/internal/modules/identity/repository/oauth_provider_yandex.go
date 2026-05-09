@@ -29,7 +29,7 @@ func (p *YandexOAuthProvider) Name() domain.OAuthProviderKind {
 }
 
 func (p *YandexOAuthProvider) AuthURL(_ context.Context, state string, session domain.OAuthSession) (string, error) {
-	scope := "login:email login:info"
+	scope := "login:email login:avatar"
 	if len(p.cfg.Scopes) > 0 {
 		scope = strings.Join(p.cfg.Scopes, " ")
 	}
