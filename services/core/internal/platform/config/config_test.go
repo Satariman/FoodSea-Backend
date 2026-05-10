@@ -226,3 +226,11 @@ func TestLoad_InvalidPhotoSearchConfig(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "PHOTO_SEARCH_MAX_IMAGE_BYTES")
 }
+
+func TestLoad_InvalidPhotoSearchTimeoutConfig(t *testing.T) {
+	setenv(t, "PHOTO_SEARCH_TIMEOUT", "0s")
+
+	_, err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PHOTO_SEARCH_TIMEOUT")
+}
