@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	AnalogService_GetAnalogs_FullMethodName      = "/ml.AnalogService/GetAnalogs"
 	AnalogService_GetBatchAnalogs_FullMethodName = "/ml.AnalogService/GetBatchAnalogs"
+	AnalogService_SearchByPhoto_FullMethodName   = "/ml.AnalogService/SearchByPhoto"
 )
 
 // AnalogServiceClient is the client API for AnalogService service.
@@ -29,6 +30,7 @@ const (
 type AnalogServiceClient interface {
 	GetAnalogs(ctx context.Context, in *GetAnalogsRequest, opts ...grpc.CallOption) (*GetAnalogsResponse, error)
 	GetBatchAnalogs(ctx context.Context, in *GetBatchAnalogsRequest, opts ...grpc.CallOption) (*GetBatchAnalogsResponse, error)
+	SearchByPhoto(ctx context.Context, in *SearchByPhotoRequest, opts ...grpc.CallOption) (*SearchByPhotoResponse, error)
 }
 
 type analogServiceClient struct {
@@ -59,12 +61,23 @@ func (c *analogServiceClient) GetBatchAnalogs(ctx context.Context, in *GetBatchA
 	return out, nil
 }
 
+func (c *analogServiceClient) SearchByPhoto(ctx context.Context, in *SearchByPhotoRequest, opts ...grpc.CallOption) (*SearchByPhotoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchByPhotoResponse)
+	err := c.cc.Invoke(ctx, AnalogService_SearchByPhoto_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AnalogServiceServer is the server API for AnalogService service.
 // All implementations must embed UnimplementedAnalogServiceServer
 // for forward compatibility.
 type AnalogServiceServer interface {
 	GetAnalogs(context.Context, *GetAnalogsRequest) (*GetAnalogsResponse, error)
 	GetBatchAnalogs(context.Context, *GetBatchAnalogsRequest) (*GetBatchAnalogsResponse, error)
+	SearchByPhoto(context.Context, *SearchByPhotoRequest) (*SearchByPhotoResponse, error)
 	mustEmbedUnimplementedAnalogServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedAnalogServiceServer) GetAnalogs(context.Context, *GetAnalogsR
 }
 func (UnimplementedAnalogServiceServer) GetBatchAnalogs(context.Context, *GetBatchAnalogsRequest) (*GetBatchAnalogsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBatchAnalogs not implemented")
+}
+func (UnimplementedAnalogServiceServer) SearchByPhoto(context.Context, *SearchByPhotoRequest) (*SearchByPhotoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchByPhoto not implemented")
 }
 func (UnimplementedAnalogServiceServer) mustEmbedUnimplementedAnalogServiceServer() {}
 func (UnimplementedAnalogServiceServer) testEmbeddedByValue()                       {}
@@ -138,6 +154,24 @@ func _AnalogService_GetBatchAnalogs_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AnalogService_SearchByPhoto_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchByPhotoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnalogServiceServer).SearchByPhoto(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnalogService_SearchByPhoto_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnalogServiceServer).SearchByPhoto(ctx, req.(*SearchByPhotoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AnalogService_ServiceDesc is the grpc.ServiceDesc for AnalogService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var AnalogService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBatchAnalogs",
 			Handler:    _AnalogService_GetBatchAnalogs_Handler,
+		},
+		{
+			MethodName: "SearchByPhoto",
+			Handler:    _AnalogService_SearchByPhoto_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

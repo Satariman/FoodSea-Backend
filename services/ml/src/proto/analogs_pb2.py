@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\ranalogs.proto\x12\x02ml\"e\n\x11GetAnalogsRequest\x12\x12\n\nproduct_id\x18\x01 \x01(\t\x12\r\n\x05top_k\x18\x02 \x01(\x05\x12\x13\n\x0bprice_aware\x18\x03 \x01(\x08\x12\x18\n\x10\x66ilter_store_ids\x18\x04 \x03(\t\"6\n\x12GetAnalogsResponse\x12 \n\x07\x61nalogs\x18\x01 \x03(\x0b\x32\x0f.ml.AnalogProto\"a\n\x0b\x41nalogProto\x12\x12\n\nproduct_id\x18\x01 \x01(\t\x12\x14\n\x0cproduct_name\x18\x02 \x01(\t\x12\r\n\x05score\x18\x03 \x01(\x01\x12\x19\n\x11min_price_kopecks\x18\x04 \x01(\x03\"V\n\x16GetBatchAnalogsRequest\x12\x13\n\x0bproduct_ids\x18\x01 \x03(\t\x12\r\n\x05top_k\x18\x02 \x01(\x05\x12\x18\n\x10\x66ilter_store_ids\x18\x03 \x03(\t\"\xb1\x01\n\x17GetBatchAnalogsResponse\x12M\n\x12\x61nalogs_by_product\x18\x01 \x03(\x0b\x32\x31.ml.GetBatchAnalogsResponse.AnalogsByProductEntry\x1aG\n\x15\x41nalogsByProductEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.ml.AnalogList:\x02\x38\x01\".\n\nAnalogList\x12 \n\x07\x61nalogs\x18\x01 \x03(\x0b\x32\x0f.ml.AnalogProto2\x98\x01\n\rAnalogService\x12;\n\nGetAnalogs\x12\x15.ml.GetAnalogsRequest\x1a\x16.ml.GetAnalogsResponse\x12J\n\x0fGetBatchAnalogs\x12\x1a.ml.GetBatchAnalogsRequest\x1a\x1b.ml.GetBatchAnalogsResponseB\x1dZ\x1bgithub.com/foodsea/proto/mlb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\ranalogs.proto\x12\x02ml\"e\n\x11GetAnalogsRequest\x12\x12\n\nproduct_id\x18\x01 \x01(\t\x12\r\n\x05top_k\x18\x02 \x01(\x05\x12\x13\n\x0bprice_aware\x18\x03 \x01(\x08\x12\x18\n\x10\x66ilter_store_ids\x18\x04 \x03(\t\"6\n\x12GetAnalogsResponse\x12 \n\x07\x61nalogs\x18\x01 \x03(\x0b\x32\x0f.ml.AnalogProto\"a\n\x0b\x41nalogProto\x12\x12\n\nproduct_id\x18\x01 \x01(\t\x12\x14\n\x0cproduct_name\x18\x02 \x01(\t\x12\r\n\x05score\x18\x03 \x01(\x01\x12\x19\n\x11min_price_kopecks\x18\x04 \x01(\x03\"V\n\x16GetBatchAnalogsRequest\x12\x13\n\x0bproduct_ids\x18\x01 \x03(\t\x12\r\n\x05top_k\x18\x02 \x01(\x05\x12\x18\n\x10\x66ilter_store_ids\x18\x03 \x03(\t\"\xb1\x01\n\x17GetBatchAnalogsResponse\x12M\n\x12\x61nalogs_by_product\x18\x01 \x03(\x0b\x32\x31.ml.GetBatchAnalogsResponse.AnalogsByProductEntry\x1aG\n\x15\x41nalogsByProductEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.ml.AnalogList:\x02\x38\x01\".\n\nAnalogList\x12 \n\x07\x61nalogs\x18\x01 \x03(\x0b\x32\x0f.ml.AnalogProto\"_\n\x14SearchByPhotoRequest\x12\r\n\x05image\x18\x01 \x01(\x0c\x12\x17\n\x0fimage_mime_type\x18\x02 \x01(\t\x12\x10\n\x08ocr_text\x18\x03 \x01(\t\x12\r\n\x05top_k\x18\x04 \x01(\x05\"r\n\x15SearchByPhotoResponse\x12\x14\n\x0cmatched_name\x18\x01 \x01(\t\x12\x15\n\rmatched_brand\x18\x02 \x01(\t\x12,\n\ncandidates\x18\x03 \x03(\x0b\x32\x18.ml.PhotoSearchCandidate\"9\n\x14PhotoSearchCandidate\x12\x12\n\nproduct_id\x18\x01 \x01(\t\x12\r\n\x05score\x18\x02 \x01(\x01\x32\xde\x01\n\rAnalogService\x12;\n\nGetAnalogs\x12\x15.ml.GetAnalogsRequest\x1a\x16.ml.GetAnalogsResponse\x12J\n\x0fGetBatchAnalogs\x12\x1a.ml.GetBatchAnalogsRequest\x1a\x1b.ml.GetBatchAnalogsResponse\x12\x44\n\rSearchByPhoto\x12\x18.ml.SearchByPhotoRequest\x1a\x19.ml.SearchByPhotoResponseB\x1dZ\x1bgithub.com/foodsea/proto/mlb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -38,6 +38,12 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_GETBATCHANALOGSRESPONSE_ANALOGSBYPRODUCTENTRY']._serialized_end=545
   _globals['_ANALOGLIST']._serialized_start=547
   _globals['_ANALOGLIST']._serialized_end=593
-  _globals['_ANALOGSERVICE']._serialized_start=596
-  _globals['_ANALOGSERVICE']._serialized_end=748
+  _globals['_SEARCHBYPHOTOREQUEST']._serialized_start=595
+  _globals['_SEARCHBYPHOTOREQUEST']._serialized_end=690
+  _globals['_SEARCHBYPHOTORESPONSE']._serialized_start=692
+  _globals['_SEARCHBYPHOTORESPONSE']._serialized_end=806
+  _globals['_PHOTOSEARCHCANDIDATE']._serialized_start=808
+  _globals['_PHOTOSEARCHCANDIDATE']._serialized_end=865
+  _globals['_ANALOGSERVICE']._serialized_start=868
+  _globals['_ANALOGSERVICE']._serialized_end=1090
 # @@protoc_insertion_point(module_scope)

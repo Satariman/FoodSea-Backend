@@ -5,6 +5,7 @@ option go_package = "github.com/foodsea/proto/ml";
 service AnalogService {
     rpc GetAnalogs(GetAnalogsRequest) returns (GetAnalogsResponse);
     rpc GetBatchAnalogs(GetBatchAnalogsRequest) returns (GetBatchAnalogsResponse);
+    rpc SearchByPhoto(SearchByPhotoRequest) returns (SearchByPhotoResponse);
 }
 
 message GetAnalogsRequest {
@@ -40,4 +41,22 @@ message GetBatchAnalogsResponse {
 
 message AnalogList {
     repeated AnalogProto analogs = 1;
+}
+
+message SearchByPhotoRequest {
+    bytes image = 1;
+    string image_mime_type = 2;
+    string ocr_text = 3;
+    int32 top_k = 4;
+}
+
+message SearchByPhotoResponse {
+    string matched_name = 1;
+    string matched_brand = 2;
+    repeated PhotoSearchCandidate candidates = 3;
+}
+
+message PhotoSearchCandidate {
+    string product_id = 1;
+    double score = 2;
 }

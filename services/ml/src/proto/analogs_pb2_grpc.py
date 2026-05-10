@@ -4,12 +4,6 @@ import grpc
 
 from . import analogs_pb2 as analogs__pb2
 
-_grpc_experimental = getattr(grpc, "experimental", None)
-_GetAnalogsRequest = getattr(analogs__pb2, "GetAnalogsRequest")
-_GetAnalogsResponse = getattr(analogs__pb2, "GetAnalogsResponse")
-_GetBatchAnalogsRequest = getattr(analogs__pb2, "GetBatchAnalogsRequest")
-_GetBatchAnalogsResponse = getattr(analogs__pb2, "GetBatchAnalogsResponse")
-
 
 class AnalogServiceStub(object):
     """Missing associated documentation comment in .proto file."""
@@ -22,13 +16,18 @@ class AnalogServiceStub(object):
         """
         self.GetAnalogs = channel.unary_unary(
                 '/ml.AnalogService/GetAnalogs',
-                request_serializer=_GetAnalogsRequest.SerializeToString,
-                response_deserializer=_GetAnalogsResponse.FromString,
+                request_serializer=analogs__pb2.GetAnalogsRequest.SerializeToString,
+                response_deserializer=analogs__pb2.GetAnalogsResponse.FromString,
                 )
         self.GetBatchAnalogs = channel.unary_unary(
                 '/ml.AnalogService/GetBatchAnalogs',
-                request_serializer=_GetBatchAnalogsRequest.SerializeToString,
-                response_deserializer=_GetBatchAnalogsResponse.FromString,
+                request_serializer=analogs__pb2.GetBatchAnalogsRequest.SerializeToString,
+                response_deserializer=analogs__pb2.GetBatchAnalogsResponse.FromString,
+                )
+        self.SearchByPhoto = channel.unary_unary(
+                '/ml.AnalogService/SearchByPhoto',
+                request_serializer=analogs__pb2.SearchByPhotoRequest.SerializeToString,
+                response_deserializer=analogs__pb2.SearchByPhotoResponse.FromString,
                 )
 
 
@@ -47,18 +46,29 @@ class AnalogServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SearchByPhoto(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AnalogServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'GetAnalogs': grpc.unary_unary_rpc_method_handler(
                     servicer.GetAnalogs,
-                    request_deserializer=_GetAnalogsRequest.FromString,
-                    response_serializer=_GetAnalogsResponse.SerializeToString,
+                    request_deserializer=analogs__pb2.GetAnalogsRequest.FromString,
+                    response_serializer=analogs__pb2.GetAnalogsResponse.SerializeToString,
             ),
             'GetBatchAnalogs': grpc.unary_unary_rpc_method_handler(
                     servicer.GetBatchAnalogs,
-                    request_deserializer=_GetBatchAnalogsRequest.FromString,
-                    response_serializer=_GetBatchAnalogsResponse.SerializeToString,
+                    request_deserializer=analogs__pb2.GetBatchAnalogsRequest.FromString,
+                    response_serializer=analogs__pb2.GetBatchAnalogsResponse.SerializeToString,
+            ),
+            'SearchByPhoto': grpc.unary_unary_rpc_method_handler(
+                    servicer.SearchByPhoto,
+                    request_deserializer=analogs__pb2.SearchByPhotoRequest.FromString,
+                    response_serializer=analogs__pb2.SearchByPhotoResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -81,11 +91,9 @@ class AnalogService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        if _grpc_experimental is None:
-            raise RuntimeError("grpc.experimental is unavailable in this grpcio runtime")
-        return _grpc_experimental.unary_unary(request, target, '/ml.AnalogService/GetAnalogs',
-            _GetAnalogsRequest.SerializeToString,
-            _GetAnalogsResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/ml.AnalogService/GetAnalogs',
+            analogs__pb2.GetAnalogsRequest.SerializeToString,
+            analogs__pb2.GetAnalogsResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -100,10 +108,25 @@ class AnalogService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        if _grpc_experimental is None:
-            raise RuntimeError("grpc.experimental is unavailable in this grpcio runtime")
-        return _grpc_experimental.unary_unary(request, target, '/ml.AnalogService/GetBatchAnalogs',
-            _GetBatchAnalogsRequest.SerializeToString,
-            _GetBatchAnalogsResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/ml.AnalogService/GetBatchAnalogs',
+            analogs__pb2.GetBatchAnalogsRequest.SerializeToString,
+            analogs__pb2.GetBatchAnalogsResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SearchByPhoto(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/ml.AnalogService/SearchByPhoto',
+            analogs__pb2.SearchByPhotoRequest.SerializeToString,
+            analogs__pb2.SearchByPhotoResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
