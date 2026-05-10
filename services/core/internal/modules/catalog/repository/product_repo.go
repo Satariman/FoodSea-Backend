@@ -80,6 +80,9 @@ func (r *ProductRepo) GetByBarcode(ctx context.Context, barcode string) (*domain
 func (r *ProductRepo) ListAllForML(ctx context.Context) ([]domain.ProductMLData, error) {
 	rows, err := r.client.Product.Query().
 		Where(entproduct.InStock(true)).
+		WithCategory().
+		WithSubcategory().
+		WithBrand().
 		WithNutrition().
 		WithOffers(func(q *ent.OfferQuery) {
 			q.Where(entoffer.InStock(true))
@@ -92,14 +95,27 @@ func (r *ProductRepo) ListAllForML(ctx context.Context) ([]domain.ProductMLData,
 	result := make([]domain.ProductMLData, 0, len(rows))
 	for _, row := range rows {
 		item := domain.ProductMLData{
-			ID:            row.ID,
-			Name:          row.Name,
-			Description:   row.Description,
-			Composition:   row.Composition,
-			CategoryID:    row.CategoryID,
-			SubcategoryID: row.SubcategoryID,
-			BrandID:       row.BrandID,
-			Weight:        row.Weight,
+			ID:              row.ID,
+			Name:            row.Name,
+			Description:     row.Description,
+			Composition:     row.Composition,
+			CategoryID:      row.CategoryID,
+			SubcategoryID:   row.SubcategoryID,
+			BrandID:         row.BrandID,
+			Weight:          row.Weight,
+			ImageURL:        row.ImageURL,
+			CategoryName:    "",
+			SubcategoryName: "",
+			BrandName:       "",
+		}
+		if row.Edges.Category != nil {
+			item.CategoryName = row.Edges.Category.Name
+		}
+		if row.Edges.Subcategory != nil {
+			item.SubcategoryName = row.Edges.Subcategory.Name
+		}
+		if row.Edges.Brand != nil {
+			item.BrandName = row.Edges.Brand.Name
 		}
 
 		if row.Edges.Nutrition != nil {

@@ -51,16 +51,20 @@ type OfferBrief struct {
 
 // ProductMLData contains in-stock product data exported to ml-service.
 type ProductMLData struct {
-	ID            uuid.UUID
-	Name          string
-	Description   *string
-	Composition   *string
-	CategoryID    uuid.UUID
-	SubcategoryID *uuid.UUID
-	BrandID       *uuid.UUID
-	Weight        *string
-	Nutrition     *Nutrition
-	Offers        []OfferBrief
+	ID              uuid.UUID
+	Name            string
+	Description     *string
+	Composition     *string
+	CategoryID      uuid.UUID
+	CategoryName    string
+	SubcategoryID   *uuid.UUID
+	SubcategoryName string
+	BrandID         *uuid.UUID
+	BrandName       string
+	Weight          *string
+	ImageURL        *string
+	Nutrition       *Nutrition
+	Offers          []OfferBrief
 }
 
 // BestOfferProvider fetches the best in-stock offer for a product.
