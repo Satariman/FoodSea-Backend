@@ -89,6 +89,7 @@ func seedCatalog(t *testing.T, client *ent.Client) (categoryID, subcategoryID, b
 	product, err := client.Product.Create().
 		SetName("Энергетик Burn Classic, 500 мл").
 		SetBarcode("4607025390015").
+		SetImageURL("https://cdn.foodsea.local/products/burn-classic-500.png").
 		SetInStock(true).
 		SetCategoryID(root.ID).
 		SetSubcategoryID(sub.ID).
@@ -135,6 +136,25 @@ func TestProductRepo_Integration(t *testing.T) {
 		detail, err := productRepo.GetByBarcode(ctx, "4607025390015")
 		require.NoError(t, err)
 		assert.Equal(t, productID, detail.ID)
+	})
+
+	t.Run("ListAllForML maps metadata names and image url", func(t *testing.T) {
+		rows, err := productRepo.ListAllForML(ctx)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+
+		item := rows[0]
+		assert.Equal(t, productID, item.ID)
+		assert.Equal(t, catID, item.CategoryID)
+		require.NotNil(t, item.SubcategoryID)
+		require.NotNil(t, item.BrandID)
+		assert.Equal(t, subID, *item.SubcategoryID)
+		assert.Equal(t, brandID, *item.BrandID)
+		assert.Equal(t, "Энергетики", item.CategoryName)
+		assert.Equal(t, "Энергетические напитки", item.SubcategoryName)
+		assert.Equal(t, "Burn", item.BrandName)
+		require.NotNil(t, item.ImageURL)
+		assert.Equal(t, "https://cdn.foodsea.local/products/burn-classic-500.png", *item.ImageURL)
 	})
 
 	t.Run("GetByIDWithDetails not found", func(t *testing.T) {
