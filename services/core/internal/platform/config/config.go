@@ -13,12 +13,23 @@ type Config struct {
 	Env    string
 	Server ServerConfig
 	GRPC   GRPCConfig
+	ML     MLConfig
+	PhotoSearch PhotoSearchConfig
 	DB     DatabaseConfig
 	Redis  RedisConfig
 	Kafka  KafkaConfig
 	JWT    JWTConfig
 	S3     S3Config
 	OAuth  OAuthConfig
+}
+
+type MLConfig struct {
+	GRPCAddr string
+}
+
+type PhotoSearchConfig struct {
+	MaxImageBytes int64
+	Timeout       time.Duration
 }
 
 type S3Config struct {
@@ -60,10 +71,15 @@ type JWTConfig struct {
 }
 
 type OAuthConfig struct {
-	StateTTL            time.Duration
-	AllowedRedirectURIs []string
-	Google              OAuthProviderConfig
-	Yandex              OAuthProviderConfig
+	StateTTL                  time.Duration
+	AllowedRedirectURIs       []string
+	NativeAllowedRedirectURIs []string
+	LegacyEnabled             bool
+	NativeEnabled             bool
+	Google                    OAuthProviderConfig
+	GoogleNative              OAuthProviderConfig
+	Yandex                    OAuthProviderConfig
+	YandexNativeSDKEnabled    bool
 }
 
 type OAuthProviderConfig struct {
@@ -88,6 +104,14 @@ func Load() (*Config, error) {
 	}
 	if grpcPort < 1 || grpcPort > 65535 {
 		return nil, fmt.Errorf("GRPC_PORT %d out of range [1, 65535]", grpcPort)
+	}
+	photoSearchMaxBytes := int64(getEnvInt("PHOTO_SEARCH_MAX_IMAGE_BYTES", 8*1024*1024))
+	if photoSearchMaxBytes <= 0 {
+		return nil, fmt.Errorf("PHOTO_SEARCH_MAX_IMAGE_BYTES must be > 0")
+	}
+	photoSearchTimeout := getEnvDuration("PHOTO_SEARCH_TIMEOUT", 10*time.Second)
+	if photoSearchTimeout <= 0 {
+		return nil, fmt.Errorf("PHOTO_SEARCH_TIMEOUT must be > 0")
 	}
 
 	accessTTL := getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute)
@@ -116,6 +140,13 @@ func Load() (*Config, error) {
 		GRPC: GRPCConfig{
 			Port: grpcPort,
 		},
+		ML: MLConfig{
+			GRPCAddr: getEnv("ML_GRPC_ADDR", "ml-service:50051"),
+		},
+		PhotoSearch: PhotoSearchConfig{
+			MaxImageBytes: photoSearchMaxBytes,
+			Timeout:       photoSearchTimeout,
+		},
 		DB: DatabaseConfig{
 			URL:             getEnv("DB_URL", "postgres://postgres:postgres@localhost:5433/core_db?sslmode=disable"),
 			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 25),
@@ -142,9 +173,18 @@ func Load() (*Config, error) {
 			PublicBaseURL:   getEnv("S3_PUBLIC_BASE_URL", "http://localhost:9000/product-images"),
 		},
 		OAuth: OAuthConfig{
-			StateTTL:            getEnvDuration("OAUTH_STATE_TTL", 10*time.Minute),
-			AllowedRedirectURIs: getEnvStrings("OAUTH_ALLOWED_REDIRECT_URIS", []string{}),
+			StateTTL:                  getEnvDuration("OAUTH_STATE_TTL", 10*time.Minute),
+			AllowedRedirectURIs:       getEnvStrings("OAUTH_ALLOWED_REDIRECT_URIS", []string{}),
+			NativeAllowedRedirectURIs: getEnvStrings("OAUTH_NATIVE_ALLOWED_REDIRECT_URIS", []string{}),
+			LegacyEnabled:             getEnvBool("OAUTH_LEGACY_ENABLED", true),
+			NativeEnabled:             getEnvBool("OAUTH_NATIVE_ENABLED", false),
 			Google: oauthProviderConfig("GOOGLE", OAuthProviderConfig{
+				AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
+				TokenURL:    "https://oauth2.googleapis.com/token",
+				UserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
+				Scopes:      []string{"openid", "email", "profile"},
+			}),
+			GoogleNative: oauthPublicProviderConfig("GOOGLE_NATIVE", OAuthProviderConfig{
 				AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
 				TokenURL:    "https://oauth2.googleapis.com/token",
 				UserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
@@ -156,6 +196,7 @@ func Load() (*Config, error) {
 				UserInfoURL: "https://login.yandex.ru/info",
 				Scopes:      []string{"login:email", "login:avatar"},
 			}),
+			YandexNativeSDKEnabled: getEnvBool("OAUTH_YANDEX_NATIVE_SDK_ENABLED", false),
 		},
 	}
 
@@ -165,8 +206,14 @@ func Load() (*Config, error) {
 	if err := validateOAuthProvider("YANDEX", cfg.OAuth.Yandex); err != nil {
 		return nil, err
 	}
-	if env == "production" && (cfg.OAuth.Google.Enabled || cfg.OAuth.Yandex.Enabled) && len(cfg.OAuth.AllowedRedirectURIs) == 0 {
+	if err := validatePublicOAuthProvider("GOOGLE_NATIVE", cfg.OAuth.GoogleNative); err != nil {
+		return nil, err
+	}
+	if env == "production" && cfg.OAuth.LegacyEnabled && (cfg.OAuth.Google.Enabled || cfg.OAuth.Yandex.Enabled) && len(cfg.OAuth.AllowedRedirectURIs) == 0 {
 		return nil, fmt.Errorf("OAUTH_ALLOWED_REDIRECT_URIS must be set in production when OAuth is enabled")
+	}
+	if env == "production" && cfg.OAuth.NativeEnabled && (cfg.OAuth.GoogleNative.Enabled || cfg.OAuth.YandexNativeSDKEnabled) && len(cfg.OAuth.NativeAllowedRedirectURIs) == 0 {
+		return nil, fmt.Errorf("OAUTH_NATIVE_ALLOWED_REDIRECT_URIS must be set in production when native OAuth is enabled")
 	}
 
 	return cfg, nil
@@ -188,6 +235,22 @@ func oauthProviderConfig(provider string, defaults OAuthProviderConfig) OAuthPro
 	return cfg
 }
 
+func oauthPublicProviderConfig(provider string, defaults OAuthProviderConfig) OAuthProviderConfig {
+	clientID := getEnv("OAUTH_"+provider+"_CLIENT_ID", "")
+	clientSecret := getEnv("OAUTH_"+provider+"_CLIENT_SECRET", "")
+
+	cfg := defaults
+	cfg.ClientID = clientID
+	cfg.ClientSecret = clientSecret
+	cfg.Enabled = clientID != ""
+	cfg.AuthURL = getEnv("OAUTH_"+provider+"_AUTH_URL", defaults.AuthURL)
+	cfg.TokenURL = getEnv("OAUTH_"+provider+"_TOKEN_URL", defaults.TokenURL)
+	cfg.UserInfoURL = getEnv("OAUTH_"+provider+"_USER_INFO_URL", defaults.UserInfoURL)
+	cfg.Scopes = getEnvStrings("OAUTH_"+provider+"_SCOPES", defaults.Scopes)
+
+	return cfg
+}
+
 func validateOAuthProvider(provider string, cfg OAuthProviderConfig) error {
 	clientIDKey := "OAUTH_" + provider + "_CLIENT_ID"
 	clientSecretKey := "OAUTH_" + provider + "_CLIENT_SECRET"
@@ -196,6 +259,19 @@ func validateOAuthProvider(provider string, cfg OAuthProviderConfig) error {
 	hasClientSecret := cfg.ClientSecret != ""
 	if hasClientID != hasClientSecret {
 		return fmt.Errorf("%s and %s must be set together", clientIDKey, clientSecretKey)
+	}
+
+	return nil
+}
+
+func validatePublicOAuthProvider(provider string, cfg OAuthProviderConfig) error {
+	clientIDKey := "OAUTH_" + provider + "_CLIENT_ID"
+	clientSecretKey := "OAUTH_" + provider + "_CLIENT_SECRET"
+
+	hasClientID := cfg.ClientID != ""
+	hasClientSecret := cfg.ClientSecret != ""
+	if !hasClientID && hasClientSecret {
+		return fmt.Errorf("%s must be set when %s is set", clientIDKey, clientSecretKey)
 	}
 
 	return nil

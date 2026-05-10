@@ -11,6 +11,7 @@ var (
 	ErrInvalidInput  = errors.New("invalid input")
 	ErrUnauthorized  = errors.New("unauthorized")
 	ErrConflict      = errors.New("conflict")
+	ErrUnavailable   = errors.New("unavailable")
 )
 
 // ValidationError carries field-level validation details.

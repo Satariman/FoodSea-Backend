@@ -127,21 +127,33 @@ func TestLoad_OAuthDefaults(t *testing.T) {
 func TestLoad_OAuthCustomValues(t *testing.T) {
 	setenv(t, "OAUTH_STATE_TTL", "20m")
 	setenv(t, "OAUTH_ALLOWED_REDIRECT_URIS", "https://app.foodsea.ru/oauth/callback, foodsea://oauth/callback")
+	setenv(t, "OAUTH_NATIVE_ALLOWED_REDIRECT_URIS", "foodsea-dev://oauth/callback,foodsea://oauth/callback")
+	setenv(t, "OAUTH_LEGACY_ENABLED", "false")
+	setenv(t, "OAUTH_NATIVE_ENABLED", "true")
 	setenv(t, "OAUTH_GOOGLE_CLIENT_ID", "google-client-id")
 	setenv(t, "OAUTH_GOOGLE_CLIENT_SECRET", "google-client-secret")
+	setenv(t, "OAUTH_GOOGLE_NATIVE_CLIENT_ID", "google-native-client-id")
 	setenv(t, "OAUTH_YANDEX_CLIENT_ID", "yandex-client-id")
 	setenv(t, "OAUTH_YANDEX_CLIENT_SECRET", "yandex-client-secret")
+	setenv(t, "OAUTH_YANDEX_NATIVE_SDK_ENABLED", "true")
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	assert.Equal(t, 20*time.Minute, cfg.OAuth.StateTTL)
 	assert.Equal(t, []string{"https://app.foodsea.ru/oauth/callback", "foodsea://oauth/callback"}, cfg.OAuth.AllowedRedirectURIs)
+	assert.Equal(t, []string{"foodsea-dev://oauth/callback", "foodsea://oauth/callback"}, cfg.OAuth.NativeAllowedRedirectURIs)
+	assert.False(t, cfg.OAuth.LegacyEnabled)
+	assert.True(t, cfg.OAuth.NativeEnabled)
 	assert.True(t, cfg.OAuth.Google.Enabled)
 	assert.Equal(t, "google-client-id", cfg.OAuth.Google.ClientID)
 	assert.Equal(t, "google-client-secret", cfg.OAuth.Google.ClientSecret)
+	assert.True(t, cfg.OAuth.GoogleNative.Enabled)
+	assert.Equal(t, "google-native-client-id", cfg.OAuth.GoogleNative.ClientID)
+	assert.Empty(t, cfg.OAuth.GoogleNative.ClientSecret)
 	assert.True(t, cfg.OAuth.Yandex.Enabled)
 	assert.Equal(t, "yandex-client-id", cfg.OAuth.Yandex.ClientID)
 	assert.Equal(t, "yandex-client-secret", cfg.OAuth.Yandex.ClientSecret)
+	assert.True(t, cfg.OAuth.YandexNativeSDKEnabled)
 }
 
 func TestLoad_ProdOAuthPartialCredentials(t *testing.T) {
@@ -166,4 +178,51 @@ func TestLoad_ProdOAuthWithoutRedirectURIs(t *testing.T) {
 	_, err := config.Load()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "OAUTH_ALLOWED_REDIRECT_URIS")
+}
+
+func TestLoad_ProdNativeOAuthWithoutNativeRedirectURIs(t *testing.T) {
+	setenv(t, "ENV", "production")
+	setenv(t, "JWT_SECRET", "supersecret")
+	setenv(t, "OAUTH_NATIVE_ENABLED", "true")
+	setenv(t, "OAUTH_GOOGLE_NATIVE_CLIENT_ID", "google-native-client-id")
+	unsetenv(t, "OAUTH_NATIVE_ALLOWED_REDIRECT_URIS")
+	setenv(t, "OAUTH_ALLOWED_REDIRECT_URIS", "foodsea://legacy/callback")
+
+	_, err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OAUTH_NATIVE_ALLOWED_REDIRECT_URIS")
+}
+
+func TestLoad_PhotoSearchDefaults(t *testing.T) {
+	unsetenv(t, "ML_GRPC_ADDR")
+	unsetenv(t, "PHOTO_SEARCH_MAX_IMAGE_BYTES")
+	unsetenv(t, "PHOTO_SEARCH_TIMEOUT")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, "ml-service:50051", cfg.ML.GRPCAddr)
+	assert.Equal(t, int64(8*1024*1024), cfg.PhotoSearch.MaxImageBytes)
+	assert.Equal(t, 10*time.Second, cfg.PhotoSearch.Timeout)
+}
+
+func TestLoad_PhotoSearchCustomValues(t *testing.T) {
+	setenv(t, "ML_GRPC_ADDR", "127.0.0.1:50052")
+	setenv(t, "PHOTO_SEARCH_MAX_IMAGE_BYTES", "1048576")
+	setenv(t, "PHOTO_SEARCH_TIMEOUT", "3s")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, "127.0.0.1:50052", cfg.ML.GRPCAddr)
+	assert.Equal(t, int64(1048576), cfg.PhotoSearch.MaxImageBytes)
+	assert.Equal(t, 3*time.Second, cfg.PhotoSearch.Timeout)
+}
+
+func TestLoad_InvalidPhotoSearchConfig(t *testing.T) {
+	setenv(t, "PHOTO_SEARCH_MAX_IMAGE_BYTES", "0")
+
+	_, err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PHOTO_SEARCH_MAX_IMAGE_BYTES")
 }
