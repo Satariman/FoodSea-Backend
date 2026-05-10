@@ -34,7 +34,7 @@ func DialML(ctx context.Context, addr string, log *slog.Logger, extraOpts ...grp
 	if err != nil {
 		return nil, fmt.Errorf("dialing ml gRPC: %w", err)
 	}
-	log.InfoContext(ctx, "grpc client connected", "service", "ml", "addr", addr)
+	log.InfoContext(ctx, "grpc client created", "service", "ml", "addr", addr)
 
 	return &ClientSet{
 		Analog:  pbml.NewAnalogServiceClient(conn),

@@ -10,7 +10,9 @@ import (
 	pbml "github.com/foodsea/proto/ml"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 )
 
@@ -49,4 +51,22 @@ func TestDialML(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "milk", resp.GetMatchedName())
+}
+
+func TestRetryInterceptor_RetriesOnUnavailable(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	interceptor := retryInterceptor(3, logger)
+
+	attempts := 0
+	invoker := func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
+		attempts++
+		if attempts == 1 {
+			return status.Error(codes.Unavailable, "temporary unavailable")
+		}
+		return nil
+	}
+
+	err := interceptor(context.Background(), "/ml.AnalogService/SearchByPhoto", nil, nil, nil, invoker)
+	require.NoError(t, err)
+	require.Equal(t, 2, attempts)
 }
