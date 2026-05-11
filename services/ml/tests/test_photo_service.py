@@ -11,7 +11,7 @@ from src.photo_search.service import (
     PhotoSearchIndexNotReady,
 )
 from src.proto import analogs_pb2
-from src.service import AnalogServicer
+from src.service import AnalogServicer, PhotoSearchState
 
 
 class StubEmbeddingProvider:
@@ -110,7 +110,12 @@ def test_search_by_photo_servicer_validation_and_error_mapping() -> None:
         vectors=np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
         offers={"x": {"store1": 100}},
     )
-    servicer = AnalogServicer(index=analog_index, config=cfg, photo_search=None)
+    servicer = AnalogServicer(
+        index=analog_index,
+        config=cfg,
+        photo_search=None,
+        photo_search_state=PhotoSearchState.DISABLED,
+    )
 
     no_image_ctx = DummyContext()
     no_image_resp = servicer.SearchByPhoto(
@@ -143,13 +148,33 @@ def test_search_by_photo_servicer_validation_and_error_mapping() -> None:
         disabled_ctx,
     )
     assert disabled_ctx.code == grpc.StatusCode.FAILED_PRECONDITION
+    assert disabled_ctx.details == "photo search is disabled"
+
+    unready_servicer = AnalogServicer(
+        index=analog_index,
+        config=cfg,
+        photo_search=None,
+        photo_search_state=PhotoSearchState.UNREADY,
+    )
+    unready_ctx = DummyContext()
+    unready_servicer.SearchByPhoto(
+        analogs_pb2.SearchByPhotoRequest(image=b"1", image_mime_type="image/png", ocr_text="x"),
+        unready_ctx,
+    )
+    assert unready_ctx.code == grpc.StatusCode.FAILED_PRECONDITION
+    assert unready_ctx.details == "photo search is not ready"
 
     failing_engine = PhotoSearchEngine(
         index=build_photo_index(),
-        provider=StubEmbeddingProvider(error=RuntimeError("provider down")),
+        provider=StubEmbeddingProvider(error=ConnectionError("provider down")),
         config=Config(),
     )
-    enabled_servicer = AnalogServicer(index=analog_index, config=cfg, photo_search=failing_engine)
+    enabled_servicer = AnalogServicer(
+        index=analog_index,
+        config=cfg,
+        photo_search=failing_engine,
+        photo_search_state=PhotoSearchState.READY,
+    )
     provider_error_ctx = DummyContext()
     enabled_servicer.SearchByPhoto(
         analogs_pb2.SearchByPhotoRequest(
@@ -160,3 +185,99 @@ def test_search_by_photo_servicer_validation_and_error_mapping() -> None:
         provider_error_ctx,
     )
     assert provider_error_ctx.code == grpc.StatusCode.UNAVAILABLE
+    assert "photo search provider error" in provider_error_ctx.details
+
+    local_error_engine = PhotoSearchEngine(
+        index=build_photo_index(),
+        provider=StubEmbeddingProvider(error=ValueError("bad local transform")),
+        config=Config(),
+    )
+    local_error_servicer = AnalogServicer(
+        index=analog_index,
+        config=cfg,
+        photo_search=local_error_engine,
+        photo_search_state=PhotoSearchState.READY,
+    )
+    local_error_ctx = DummyContext()
+    local_error_servicer.SearchByPhoto(
+        analogs_pb2.SearchByPhotoRequest(
+            image=b"1",
+            image_mime_type="image/png",
+            ocr_text="coca cola",
+        ),
+        local_error_ctx,
+    )
+    assert local_error_ctx.code == grpc.StatusCode.INTERNAL
+    assert local_error_ctx.details == "photo search internal error"
+
+
+def test_search_by_photo_servicer_maps_index_not_ready() -> None:
+    cfg = Config()
+    analog_index = AnalogIndex()
+    analog_index.build(
+        product_ids=["x"],
+        names={"x": "X"},
+        vectors=np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
+        offers={"x": {"store1": 100}},
+    )
+    engine = PhotoSearchEngine(index=None, provider=StubEmbeddingProvider(), config=cfg)
+    servicer = AnalogServicer(
+        index=analog_index,
+        config=cfg,
+        photo_search=engine,
+        photo_search_state=PhotoSearchState.READY,
+    )
+
+    ctx = DummyContext()
+    response = servicer.SearchByPhoto(
+        analogs_pb2.SearchByPhotoRequest(
+            image=b"1",
+            image_mime_type="image/png",
+            ocr_text="sprite",
+            top_k=2,
+        ),
+        ctx,
+    )
+    assert isinstance(response, analogs_pb2.SearchByPhotoResponse)
+    assert ctx.code == grpc.StatusCode.FAILED_PRECONDITION
+    assert ctx.details == "photo search index is not ready"
+
+
+def test_search_by_photo_servicer_success_payload() -> None:
+    cfg = Config()
+    analog_index = AnalogIndex()
+    analog_index.build(
+        product_ids=["x"],
+        names={"x": "X"},
+        vectors=np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
+        offers={"x": {"store1": 100}},
+    )
+    engine = PhotoSearchEngine(
+        index=build_photo_index(),
+        provider=StubEmbeddingProvider(vector=np.array([1.0, 0.0, 0.0], dtype=np.float32)),
+        config=cfg,
+    )
+    servicer = AnalogServicer(
+        index=analog_index,
+        config=cfg,
+        photo_search=engine,
+        photo_search_state=PhotoSearchState.READY,
+    )
+
+    ctx = DummyContext()
+    response = servicer.SearchByPhoto(
+        analogs_pb2.SearchByPhotoRequest(
+            image=b"raw-image",
+            image_mime_type="image/jpeg",
+            ocr_text="coca cola zero sugar",
+            top_k=3,
+        ),
+        ctx,
+    )
+    assert isinstance(response, analogs_pb2.SearchByPhotoResponse)
+    assert ctx.code is None
+    assert ctx.details == ""
+    assert response.matched_name == "Coca Cola Zero"
+    assert response.matched_brand == "Coca Cola"
+    assert [candidate.product_id for candidate in response.candidates] == ["a", "b", "c"]
+    assert len(response.candidates) == 3

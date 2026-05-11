@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
+from urllib import error as urlerror
+
 import grpc
 
 from src.config import Config
@@ -10,16 +13,35 @@ from src.photo_search.service import PhotoSearchEngine, PhotoSearchIndexNotReady
 from src.proto import analogs_pb2, analogs_pb2_grpc
 
 
+class PhotoSearchState(StrEnum):
+    DISABLED = "disabled"
+    UNREADY = "unready"
+    READY = "ready"
+
+
 class AnalogServicer(analogs_pb2_grpc.AnalogServiceServicer):
     def __init__(
         self,
         index: AnalogIndex,
         config: Config,
         photo_search: PhotoSearchEngine | None = None,
+        photo_search_state: PhotoSearchState = PhotoSearchState.DISABLED,
     ) -> None:
         self.index = index
         self.config = config
         self.photo_search = photo_search
+        self.photo_search_state = photo_search_state
+
+    @staticmethod
+    def _is_provider_transport_error(exc: Exception) -> bool:
+        if isinstance(exc, grpc.RpcError | TimeoutError | ConnectionError | urlerror.URLError):
+            return True
+        cause = exc.__cause__
+        while cause is not None:
+            if isinstance(cause, grpc.RpcError | TimeoutError | ConnectionError | urlerror.URLError):
+                return True
+            cause = cause.__cause__
+        return False
 
     def GetAnalogs(self, request, context):  # noqa: N802 (grpc method naming)
         if not request.product_id:
@@ -99,7 +121,10 @@ class AnalogServicer(analogs_pb2_grpc.AnalogServiceServicer):
             return analogs_pb2.SearchByPhotoResponse()
         if self.photo_search is None:
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-            context.set_details("photo search is disabled")
+            if self.photo_search_state == PhotoSearchState.DISABLED:
+                context.set_details("photo search is disabled")
+            else:
+                context.set_details("photo search is not ready")
             return analogs_pb2.SearchByPhotoResponse()
 
         top_k = request.top_k if request.top_k > 0 else 5
@@ -115,8 +140,12 @@ class AnalogServicer(analogs_pb2_grpc.AnalogServiceServicer):
             context.set_details("photo search index is not ready")
             return analogs_pb2.SearchByPhotoResponse()
         except Exception as exc:  # noqa: BLE001
-            context.set_code(grpc.StatusCode.UNAVAILABLE)
-            context.set_details(f"photo search provider error: {exc}")
+            if self._is_provider_transport_error(exc):
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details(f"photo search provider error: {exc}")
+            else:
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details("photo search internal error")
             return analogs_pb2.SearchByPhotoResponse()
 
         return analogs_pb2.SearchByPhotoResponse(

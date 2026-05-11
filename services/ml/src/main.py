@@ -18,7 +18,7 @@ from src.photo_search.embeddings import (
 )
 from src.photo_search.index import PhotoProductIndex
 from src.photo_search.service import PhotoSearchEngine
-from src.service import AnalogServicer
+from src.service import AnalogServicer, PhotoSearchState
 from src.proto import analogs_pb2_grpc
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -70,10 +70,10 @@ def build_index(config: Config) -> AnalogIndex:
     return index
 
 
-def build_photo_search(config: Config) -> PhotoSearchEngine | None:
+def build_photo_search(config: Config) -> tuple[PhotoSearchEngine | None, PhotoSearchState]:
     if not config.PHOTO_SEARCH_ENABLED:
         logger.info("photo search is disabled by config")
-        return None
+        return None, PhotoSearchState.DISABLED
 
     try:
         if config.PHOTO_SEARCH_PROVIDER == "gemini_api_key":
@@ -91,13 +91,13 @@ def build_photo_search(config: Config) -> PhotoSearchEngine | None:
             )
         else:
             logger.warning("unknown photo search provider: %s", config.PHOTO_SEARCH_PROVIDER)
-            return None
+            return None, PhotoSearchState.UNREADY
     except ProviderNotConfiguredError as exc:
         logger.warning("photo search provider is not configured: %s", exc)
-        return None
+        return None, PhotoSearchState.UNREADY
     except Exception as exc:  # noqa: BLE001
         logger.warning("failed to initialize photo search provider: %s", exc)
-        return None
+        return None, PhotoSearchState.UNREADY
 
     index = PhotoProductIndex()
     loaded = index.load(
@@ -108,7 +108,7 @@ def build_photo_search(config: Config) -> PhotoSearchEngine | None:
     )
     if not loaded:
         logger.warning("photo search index not loaded from %s", config.PHOTO_SEARCH_INDEX_PATH)
-        return None
+        return None, PhotoSearchState.UNREADY
 
     logger.info(
         "photo search enabled with provider=%s model=%s size=%d",
@@ -116,17 +116,17 @@ def build_photo_search(config: Config) -> PhotoSearchEngine | None:
         provider.model,
         len(index.product_ids),
     )
-    return PhotoSearchEngine(index=index, provider=provider, config=config)
+    return PhotoSearchEngine(index=index, provider=provider, config=config), PhotoSearchState.READY
 
 
 def serve() -> None:
     config = Config()
     index = build_index(config)
-    photo_search = build_photo_search(config)
+    photo_search, photo_search_state = build_photo_search(config)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     analogs_pb2_grpc.add_AnalogServiceServicer_to_server(
-        AnalogServicer(index, config, photo_search),
+        AnalogServicer(index, config, photo_search, photo_search_state=photo_search_state),
         server,
     )
 
