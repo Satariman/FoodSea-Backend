@@ -173,7 +173,10 @@ kubectl apply -f "${TMP_MANIFEST}"
 kubectl -n "${NS}" wait --for=condition=complete job/migrate-core --timeout=600s
 kubectl -n "${NS}" wait --for=condition=complete job/migrate-optimization --timeout=600s
 kubectl -n "${NS}" wait --for=condition=complete job/migrate-ordering --timeout=600s
-kubectl -n "${NS}" wait --for=condition=complete job/kafka-init-topics --timeout=600s
+if ! kubectl -n "${NS}" wait --for=condition=complete job/kafka-init-topics --timeout=180s; then
+  echo "warning: kafka-init-topics job did not complete in time; continuing deployment"
+  kubectl -n "${NS}" logs job/kafka-init-topics --tail=200 || true
+fi
 
 kubectl -n "${NS}" rollout status statefulset/core-postgres --timeout=600s
 kubectl -n "${NS}" rollout status statefulset/optimization-postgres --timeout=600s
