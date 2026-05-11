@@ -6,13 +6,20 @@ import grpc
 
 from src.config import Config
 from src.index import AnalogIndex
+from src.photo_search.service import PhotoSearchEngine, PhotoSearchIndexNotReady
 from src.proto import analogs_pb2, analogs_pb2_grpc
 
 
 class AnalogServicer(analogs_pb2_grpc.AnalogServiceServicer):
-    def __init__(self, index: AnalogIndex, config: Config) -> None:
+    def __init__(
+        self,
+        index: AnalogIndex,
+        config: Config,
+        photo_search: PhotoSearchEngine | None = None,
+    ) -> None:
         self.index = index
         self.config = config
+        self.photo_search = photo_search
 
     def GetAnalogs(self, request, context):  # noqa: N802 (grpc method naming)
         if not request.product_id:
@@ -76,3 +83,50 @@ class AnalogServicer(analogs_pb2_grpc.AnalogServiceServicer):
             response.analogs_by_product[source_product_id].analogs.extend(analogs)
 
         return response
+
+    def SearchByPhoto(self, request, context):  # noqa: N802 (grpc method naming)
+        if not request.image:
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details("image is required")
+            return analogs_pb2.SearchByPhotoResponse()
+        if request.image_mime_type not in {"image/jpeg", "image/png"}:
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details("image_mime_type must be image/jpeg or image/png")
+            return analogs_pb2.SearchByPhotoResponse()
+        if not request.ocr_text:
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details("ocr_text is required")
+            return analogs_pb2.SearchByPhotoResponse()
+        if self.photo_search is None:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("photo search is disabled")
+            return analogs_pb2.SearchByPhotoResponse()
+
+        top_k = request.top_k if request.top_k > 0 else 5
+        try:
+            result = self.photo_search.search(
+                image=bytes(request.image),
+                mime_type=request.image_mime_type,
+                ocr_text=request.ocr_text,
+                top_k=top_k,
+            )
+        except PhotoSearchIndexNotReady:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("photo search index is not ready")
+            return analogs_pb2.SearchByPhotoResponse()
+        except Exception as exc:  # noqa: BLE001
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            context.set_details(f"photo search provider error: {exc}")
+            return analogs_pb2.SearchByPhotoResponse()
+
+        return analogs_pb2.SearchByPhotoResponse(
+            matched_name=result.matched_name,
+            matched_brand=result.matched_brand,
+            candidates=[
+                analogs_pb2.PhotoSearchCandidate(
+                    product_id=item.product_id,
+                    score=item.score,
+                )
+                for item in result.candidates
+            ],
+        )

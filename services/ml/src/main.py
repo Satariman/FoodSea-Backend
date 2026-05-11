@@ -11,6 +11,13 @@ from src.config import Config
 from src.data_loader import DataLoader
 from src.feature_builder import FeatureBuilder
 from src.index import AnalogIndex
+from src.photo_search.embeddings import (
+    GeminiAPIEmbeddingProvider,
+    ProviderNotConfiguredError,
+    VertexAIEmbeddingProvider,
+)
+from src.photo_search.index import PhotoProductIndex
+from src.photo_search.service import PhotoSearchEngine
 from src.service import AnalogServicer
 from src.proto import analogs_pb2_grpc
 
@@ -63,12 +70,65 @@ def build_index(config: Config) -> AnalogIndex:
     return index
 
 
+def build_photo_search(config: Config) -> PhotoSearchEngine | None:
+    if not config.PHOTO_SEARCH_ENABLED:
+        logger.info("photo search is disabled by config")
+        return None
+
+    try:
+        if config.PHOTO_SEARCH_PROVIDER == "gemini_api_key":
+            provider = GeminiAPIEmbeddingProvider(
+                api_key=config.GEMINI_API_KEY,
+                model=config.PHOTO_SEARCH_MODEL,
+                dimensions=config.PHOTO_SEARCH_DIMENSIONS,
+            )
+        elif config.PHOTO_SEARCH_PROVIDER == "vertex_ai":
+            provider = VertexAIEmbeddingProvider(
+                project_id=config.VERTEX_PROJECT_ID,
+                location=config.VERTEX_LOCATION,
+                model=config.PHOTO_SEARCH_MODEL,
+                dimensions=config.PHOTO_SEARCH_DIMENSIONS,
+            )
+        else:
+            logger.warning("unknown photo search provider: %s", config.PHOTO_SEARCH_PROVIDER)
+            return None
+    except ProviderNotConfiguredError as exc:
+        logger.warning("photo search provider is not configured: %s", exc)
+        return None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("failed to initialize photo search provider: %s", exc)
+        return None
+
+    index = PhotoProductIndex()
+    loaded = index.load(
+        config.PHOTO_SEARCH_INDEX_PATH,
+        provider=provider.provider_name,
+        model=provider.model,
+        dimensions=provider.dimensions,
+    )
+    if not loaded:
+        logger.warning("photo search index not loaded from %s", config.PHOTO_SEARCH_INDEX_PATH)
+        return None
+
+    logger.info(
+        "photo search enabled with provider=%s model=%s size=%d",
+        provider.provider_name,
+        provider.model,
+        len(index.product_ids),
+    )
+    return PhotoSearchEngine(index=index, provider=provider, config=config)
+
+
 def serve() -> None:
     config = Config()
     index = build_index(config)
+    photo_search = build_photo_search(config)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    analogs_pb2_grpc.add_AnalogServiceServicer_to_server(AnalogServicer(index, config), server)
+    analogs_pb2_grpc.add_AnalogServiceServicer_to_server(
+        AnalogServicer(index, config, photo_search),
+        server,
+    )
 
     addr = f"[::]:{config.GRPC_PORT}"
     server.add_insecure_port(addr)
