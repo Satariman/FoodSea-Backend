@@ -11,17 +11,16 @@ _TOKEN_RE = re.compile(r"[a-zа-я0-9]+", flags=re.IGNORECASE)
 @dataclass(frozen=True)
 class ProductTextMeta:
     product_id: str
-    brand: str
     name: str
+    brand_name: str
 
 
 @dataclass(frozen=True)
 class ParsedOCR:
-    raw_text: str
-    normalized_text: str
-    brand: str | None
-    product_name: str | None
-    product_id: str | None
+    matched_name: str | None
+    matched_brand: str | None
+    normalized_ocr: str
+    name_confidence: float
 
 
 @dataclass(frozen=True)
@@ -34,22 +33,27 @@ class _IndexedProduct:
 
 
 class OCRProductTextParser:
+    _LOW_CONFIDENCE_THRESHOLD = 0.55
+
     def __init__(self, products: Iterable[ProductTextMeta]) -> None:
         self._products = [self._index_product(product) for product in products]
 
     def parse(self, text: str) -> ParsedOCR:
-        normalized_text = self._normalize_text(text)
-        ocr_tokens = self._tokenize(normalized_text)
+        normalized_ocr = self._normalize_text(text)
+        ocr_tokens = self._tokenize(normalized_ocr)
 
-        brand = self._match_brand(ocr_tokens)
-        matched_product = self._match_product(ocr_tokens, brand)
+        matched_brand = self._match_brand(ocr_tokens)
+        matched_product, name_confidence = self._match_product(ocr_tokens, matched_brand)
+        matched_name = matched_product.meta.name if matched_product else None
+
+        if name_confidence < self._LOW_CONFIDENCE_THRESHOLD:
+            matched_name = self._fallback_name_snippet(normalized_ocr)
 
         return ParsedOCR(
-            raw_text=text,
-            normalized_text=normalized_text,
-            brand=brand,
-            product_name=matched_product.meta.name if matched_product else None,
-            product_id=matched_product.meta.product_id if matched_product else None,
+            matched_name=matched_name,
+            matched_brand=matched_brand,
+            normalized_ocr=normalized_ocr,
+            name_confidence=name_confidence,
         )
 
     def _match_brand(self, ocr_tokens: tuple[str, ...]) -> str | None:
@@ -58,7 +62,7 @@ class OCRProductTextParser:
 
         seen: dict[str, tuple[str, ...]] = {}
         for product in self._products:
-            seen.setdefault(product.meta.brand, product.brand_tokens)
+            seen.setdefault(product.meta.brand_name, product.brand_tokens)
 
         for brand, brand_tokens in seen.items():
             score = self._overlap_score(ocr_tokens, brand_tokens)
@@ -70,25 +74,27 @@ class OCRProductTextParser:
 
     def _match_product(
         self, ocr_tokens: tuple[str, ...], brand: str | None
-    ) -> _IndexedProduct | None:
+    ) -> tuple[_IndexedProduct | None, float]:
         candidates = self._products
         if brand is not None:
-            candidates = [product for product in self._products if product.meta.brand == brand]
+            candidates = [product for product in self._products if product.meta.brand_name == brand]
 
         best: _IndexedProduct | None = None
         best_score = 0.0
 
         for product in candidates:
-            score = self._overlap_score(ocr_tokens, product.name_tokens)
+            score = self._name_confidence(ocr_tokens, product.name_tokens)
             if score > best_score:
                 best_score = score
                 best = product
 
-        return best if best_score > 0 else None
+        if best_score <= 0:
+            return None, 0.0
+        return best, best_score
 
     @staticmethod
     def _index_product(product: ProductTextMeta) -> _IndexedProduct:
-        normalized_brand = OCRProductTextParser._normalize_text(product.brand)
+        normalized_brand = OCRProductTextParser._normalize_text(product.brand_name)
         normalized_name = OCRProductTextParser._normalize_text(product.name)
         return _IndexedProduct(
             meta=product,
@@ -117,3 +123,29 @@ class OCRProductTextParser:
         if overlap == 0:
             return 0.0
         return overlap / len(candidate_tokens)
+
+    @staticmethod
+    def _important_token_overlap(
+        ocr_tokens: tuple[str, ...], candidate_tokens: tuple[str, ...]
+    ) -> float:
+        if not ocr_tokens or not candidate_tokens:
+            return 0.0
+        important = tuple(token for token in candidate_tokens if len(token) >= 4)
+        if not important:
+            return OCRProductTextParser._overlap_score(ocr_tokens, candidate_tokens)
+        return OCRProductTextParser._overlap_score(ocr_tokens, important)
+
+    @staticmethod
+    def _name_confidence(ocr_tokens: tuple[str, ...], candidate_tokens: tuple[str, ...]) -> float:
+        base_overlap = OCRProductTextParser._overlap_score(ocr_tokens, candidate_tokens)
+        important_overlap = OCRProductTextParser._important_token_overlap(
+            ocr_tokens, candidate_tokens
+        )
+        return round((base_overlap * 0.4) + (important_overlap * 0.6), 3)
+
+    @staticmethod
+    def _fallback_name_snippet(normalized_ocr: str, max_tokens: int = 6) -> str | None:
+        tokens = OCRProductTextParser._tokenize(normalized_ocr)
+        if not tokens:
+            return None
+        return " ".join(tokens[:max_tokens])
