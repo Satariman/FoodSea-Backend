@@ -2,6 +2,8 @@
         docker-build dev-infra-up dev-infra-down dev-core dev-ordering dev-all dev-oauth-all stop-all up down \
         k8s-render k8s-deploy k8s-down k8s-logs k8s-status \
         migrate-core migrate-optimization migrate-ordering migrate \
+        visual-profiles gemini-images-test gemini-images-brand-samples gemini-images-all-brand-samples gemini-images-submit gemini-images-status gemini-images-download import-generated-images \
+        rebuild-photo-search-index \
         atlas-diff-core atlas-diff-ordering atlas-hash \
         seed-core \
         tools
@@ -144,6 +146,59 @@ test-all: test-go-all test-ml test-swagger-regression
 
 test: test-unit
 
+# ── Product image generation ────────────────────────────────────────────────
+
+GEMINI_IMAGE_LIMIT ?= 5
+GEMINI_IMAGE_BATCH_NAME ?=
+GEMINI_IMAGE_EXTRA_ARGS ?=
+VISUAL_PROFILES_FORCE ?= 0
+IMAGE_IMPORT_MANIFEST ?= ../../reports/generated_product_images/manifest.jsonl
+IMAGE_IMPORT_STATUSES ?= likely_wrong,uncertain,no_image
+IMAGE_IMPORT_EXTRA_ARGS ?=
+
+visual-profiles:
+	@if [ "$(VISUAL_PROFILES_FORCE)" = "1" ] || \
+		[ ! -s reports/brand_visual_profiles.json ] || \
+		[ ! -s reports/product_visual_generation_profiles.jsonl ] || \
+		[ ! -s reports/product_visual_generation_profiles.csv ]; then \
+		echo "Building visual profiles from DB..."; \
+		python3 scripts/build_visual_generation_profiles.py; \
+	else \
+		echo "Using existing visual profiles (set VISUAL_PROFILES_FORCE=1 to rebuild from DB)."; \
+	fi
+
+gemini-images-test: visual-profiles
+	python3 scripts/generate_product_images_gemini.py --limit $(GEMINI_IMAGE_LIMIT) $(GEMINI_IMAGE_EXTRA_ARGS)
+
+gemini-images-brand-samples: visual-profiles
+	python3 scripts/generate_product_images_gemini.py --brand-profile-sample --brand-confidence curated_known_brand,local_reference_curated $(GEMINI_IMAGE_EXTRA_ARGS)
+
+gemini-images-all-brand-samples: visual-profiles
+	python3 scripts/generate_product_images_gemini.py --brand-profile-sample $(GEMINI_IMAGE_EXTRA_ARGS)
+
+gemini-images-submit: visual-profiles
+	python3 scripts/generate_product_images_gemini.py $(GEMINI_IMAGE_EXTRA_ARGS)
+
+gemini-images-status:
+	@if [ -z "$(GEMINI_IMAGE_BATCH_NAME)" ]; then \
+		echo "Set GEMINI_IMAGE_BATCH_NAME=batches/..."; \
+		exit 1; \
+	fi
+	python3 scripts/generate_product_images_gemini.py --action status --batch-name "$(GEMINI_IMAGE_BATCH_NAME)"
+
+gemini-images-download:
+	@if [ -z "$(GEMINI_IMAGE_BATCH_NAME)" ]; then \
+		echo "Set GEMINI_IMAGE_BATCH_NAME=batches/..."; \
+		exit 1; \
+	fi
+	python3 scripts/generate_product_images_gemini.py --action download --batch-name "$(GEMINI_IMAGE_BATCH_NAME)" --wait
+
+import-generated-images:
+	cd services/core && go run ./cmd/import-generated-images --manifest "$(IMAGE_IMPORT_MANIFEST)" --statuses "$(IMAGE_IMPORT_STATUSES)" $(IMAGE_IMPORT_EXTRA_ARGS)
+
+rebuild-photo-search-index:
+	cd services/ml && $(MAKE) rebuild-photo-index
+
 # ── Lint ─────────────────────────────────────────────────────────────────────
 
 lint:
@@ -168,6 +223,9 @@ ORDERING_DB_URL  ?= postgres://postgres:postgres@localhost:5435/ordering_db?sslm
 DEV_STATE_DIR    ?= .dev
 OAUTH_STATE_TTL  ?= 10m
 OAUTH_ALLOWED_REDIRECT_URIS ?= http://localhost:3000/oauth/callback
+OAUTH_NATIVE_ALLOWED_REDIRECT_URIS ?= app://foodsea/oauth/callback,http://localhost:3000/oauth/callback
+OAUTH_LEGACY_ENABLED ?= true
+OAUTH_NATIVE_ENABLED ?= true
 
 OAUTH_GOOGLE_ENABLED ?= false
 OAUTH_GOOGLE_CLIENT_ID ?=
@@ -175,6 +233,11 @@ OAUTH_GOOGLE_CLIENT_SECRET ?=
 OAUTH_GOOGLE_AUTH_URL ?= https://accounts.google.com/o/oauth2/v2/auth
 OAUTH_GOOGLE_TOKEN_URL ?= https://oauth2.googleapis.com/token
 OAUTH_GOOGLE_SCOPES ?= openid,email,profile
+OAUTH_GOOGLE_NATIVE_CLIENT_ID ?=
+OAUTH_GOOGLE_NATIVE_CLIENT_SECRET ?=
+OAUTH_GOOGLE_NATIVE_AUTH_URL ?= https://accounts.google.com/o/oauth2/v2/auth
+OAUTH_GOOGLE_NATIVE_TOKEN_URL ?= https://oauth2.googleapis.com/token
+OAUTH_GOOGLE_NATIVE_SCOPES ?= openid,email,profile
 
 OAUTH_YANDEX_ENABLED ?= false
 OAUTH_YANDEX_CLIENT_ID ?=
@@ -183,6 +246,7 @@ OAUTH_YANDEX_AUTH_URL ?= https://oauth.yandex.ru/authorize
 OAUTH_YANDEX_TOKEN_URL ?= https://oauth.yandex.ru/token
 OAUTH_YANDEX_USERINFO_URL ?= https://login.yandex.ru/info
 OAUTH_YANDEX_SCOPES ?= login:email,login:avatar
+OAUTH_YANDEX_NATIVE_SDK_ENABLED ?= true
 
 # ── Local infrastructure ─────────────────────────────────────────────────────
 
@@ -240,7 +304,7 @@ dev-all:
 	@if [ -f $(DEV_STATE_DIR)/core.pid ] && kill -0 $$(cat $(DEV_STATE_DIR)/core.pid) 2>/dev/null; then \
 		echo "core-service already running"; \
 	else \
-		(cd services/core; nohup env ENV=development SERVER_PORT=8081 GRPC_PORT=9091 DB_URL="$(CORE_DB_URL)" REDIS_URL=redis://localhost:6379/0 KAFKA_BROKERS=localhost:9092 JWT_SECRET=dev-secret-change-in-prod OAUTH_STATE_TTL="$(OAUTH_STATE_TTL)" OAUTH_ALLOWED_REDIRECT_URIS="$(OAUTH_ALLOWED_REDIRECT_URIS)" OAUTH_GOOGLE_ENABLED="$(OAUTH_GOOGLE_ENABLED)" OAUTH_GOOGLE_CLIENT_ID="$(OAUTH_GOOGLE_CLIENT_ID)" OAUTH_GOOGLE_CLIENT_SECRET="$(OAUTH_GOOGLE_CLIENT_SECRET)" OAUTH_GOOGLE_AUTH_URL="$(OAUTH_GOOGLE_AUTH_URL)" OAUTH_GOOGLE_TOKEN_URL="$(OAUTH_GOOGLE_TOKEN_URL)" OAUTH_GOOGLE_SCOPES="$(OAUTH_GOOGLE_SCOPES)" OAUTH_YANDEX_ENABLED="$(OAUTH_YANDEX_ENABLED)" OAUTH_YANDEX_CLIENT_ID="$(OAUTH_YANDEX_CLIENT_ID)" OAUTH_YANDEX_CLIENT_SECRET="$(OAUTH_YANDEX_CLIENT_SECRET)" OAUTH_YANDEX_AUTH_URL="$(OAUTH_YANDEX_AUTH_URL)" OAUTH_YANDEX_TOKEN_URL="$(OAUTH_YANDEX_TOKEN_URL)" OAUTH_YANDEX_USERINFO_URL="$(OAUTH_YANDEX_USERINFO_URL)" OAUTH_YANDEX_SCOPES="$(OAUTH_YANDEX_SCOPES)" go run ./cmd/api > "$(CURDIR)/$(DEV_STATE_DIR)/core.log" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(DEV_STATE_DIR)/core.pid"); \
+		(cd services/core; nohup env ENV=development SERVER_PORT=8081 GRPC_PORT=9091 DB_URL="$(CORE_DB_URL)" REDIS_URL=redis://localhost:6379/0 KAFKA_BROKERS=localhost:9092 JWT_SECRET=dev-secret-change-in-prod OAUTH_STATE_TTL="$(OAUTH_STATE_TTL)" OAUTH_ALLOWED_REDIRECT_URIS="$(OAUTH_ALLOWED_REDIRECT_URIS)" OAUTH_NATIVE_ALLOWED_REDIRECT_URIS="$(OAUTH_NATIVE_ALLOWED_REDIRECT_URIS)" OAUTH_LEGACY_ENABLED="$(OAUTH_LEGACY_ENABLED)" OAUTH_NATIVE_ENABLED="$(OAUTH_NATIVE_ENABLED)" OAUTH_GOOGLE_ENABLED="$(OAUTH_GOOGLE_ENABLED)" OAUTH_GOOGLE_CLIENT_ID="$(OAUTH_GOOGLE_CLIENT_ID)" OAUTH_GOOGLE_CLIENT_SECRET="$(OAUTH_GOOGLE_CLIENT_SECRET)" OAUTH_GOOGLE_AUTH_URL="$(OAUTH_GOOGLE_AUTH_URL)" OAUTH_GOOGLE_TOKEN_URL="$(OAUTH_GOOGLE_TOKEN_URL)" OAUTH_GOOGLE_SCOPES="$(OAUTH_GOOGLE_SCOPES)" OAUTH_GOOGLE_NATIVE_CLIENT_ID="$(OAUTH_GOOGLE_NATIVE_CLIENT_ID)" OAUTH_GOOGLE_NATIVE_CLIENT_SECRET="$(OAUTH_GOOGLE_NATIVE_CLIENT_SECRET)" OAUTH_GOOGLE_NATIVE_AUTH_URL="$(OAUTH_GOOGLE_NATIVE_AUTH_URL)" OAUTH_GOOGLE_NATIVE_TOKEN_URL="$(OAUTH_GOOGLE_NATIVE_TOKEN_URL)" OAUTH_GOOGLE_NATIVE_SCOPES="$(OAUTH_GOOGLE_NATIVE_SCOPES)" OAUTH_YANDEX_ENABLED="$(OAUTH_YANDEX_ENABLED)" OAUTH_YANDEX_CLIENT_ID="$(OAUTH_YANDEX_CLIENT_ID)" OAUTH_YANDEX_CLIENT_SECRET="$(OAUTH_YANDEX_CLIENT_SECRET)" OAUTH_YANDEX_AUTH_URL="$(OAUTH_YANDEX_AUTH_URL)" OAUTH_YANDEX_TOKEN_URL="$(OAUTH_YANDEX_TOKEN_URL)" OAUTH_YANDEX_USERINFO_URL="$(OAUTH_YANDEX_USERINFO_URL)" OAUTH_YANDEX_SCOPES="$(OAUTH_YANDEX_SCOPES)" OAUTH_YANDEX_NATIVE_SDK_ENABLED="$(OAUTH_YANDEX_NATIVE_SDK_ENABLED)" go run ./cmd/api > "$(CURDIR)/$(DEV_STATE_DIR)/core.log" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(DEV_STATE_DIR)/core.pid"); \
 	fi
 	@if [ -f $(DEV_STATE_DIR)/optimization.pid ] && kill -0 $$(cat $(DEV_STATE_DIR)/optimization.pid) 2>/dev/null; then \
 		echo "optimization-service already running"; \
@@ -261,9 +325,12 @@ dev-all:
 dev-oauth-all:
 	@if [ -z "$(OAUTH_GOOGLE_CLIENT_ID)" ]; then echo "OAUTH_GOOGLE_CLIENT_ID is required for dev-oauth-all"; exit 1; fi
 	@if [ -z "$(OAUTH_GOOGLE_CLIENT_SECRET)" ]; then echo "OAUTH_GOOGLE_CLIENT_SECRET is required for dev-oauth-all"; exit 1; fi
+	@if [ -z "$(OAUTH_GOOGLE_NATIVE_CLIENT_ID)" ]; then echo "OAUTH_GOOGLE_NATIVE_CLIENT_ID is required for dev-oauth-all"; exit 1; fi
 	@if [ -z "$(OAUTH_YANDEX_CLIENT_ID)" ]; then echo "OAUTH_YANDEX_CLIENT_ID is required for dev-oauth-all"; exit 1; fi
 	@if [ -z "$(OAUTH_YANDEX_CLIENT_SECRET)" ]; then echo "OAUTH_YANDEX_CLIENT_SECRET is required for dev-oauth-all"; exit 1; fi
 	OAUTH_GOOGLE_ENABLED=true \
+	OAUTH_NATIVE_ENABLED=true \
+	OAUTH_LEGACY_ENABLED=true \
 	OAUTH_YANDEX_ENABLED=true \
 	$(MAKE) dev-all
 

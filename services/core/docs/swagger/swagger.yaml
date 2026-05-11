@@ -268,6 +268,13 @@ definitions:
     - redirect_uri
     - state
     type: object
+  internal_modules_identity_handler.OAuthNativeSDKCallbackRequest:
+    properties:
+      access_token:
+        type: string
+    required:
+    - access_token
+    type: object
   internal_modules_identity_handler.OAuthStartResponse:
     properties:
       auth_url:
@@ -358,6 +365,26 @@ definitions:
       name:
         type: string
       slug:
+        type: string
+    type: object
+  internal_modules_photo_search_handler.photoSearchCandidateItem:
+    properties:
+      product:
+        $ref: '#/definitions/github_com_foodsea_core_internal_modules_catalog_handler.ProductDetailResponse'
+      score:
+        type: number
+      source:
+        type: string
+    type: object
+  internal_modules_photo_search_handler.searchByPhotoResponse:
+    properties:
+      candidates:
+        items:
+          $ref: '#/definitions/internal_modules_photo_search_handler.photoSearchCandidateItem'
+        type: array
+      matched_brand:
+        type: string
+      matched_name:
         type: string
     type: object
   internal_modules_search_handler.SearchResultItemResponse:
@@ -601,6 +628,140 @@ paths:
           schema:
             $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
       summary: Start OAuth flow
+      tags:
+      - auth
+  /auth/oauth/native/{provider}/callback:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges OAuth code from native client and returns auth tokens
+      parameters:
+      - description: OAuth provider
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: OAuth callback payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_handler.OAuthCallbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Finish native OAuth flow
+      tags:
+      - auth
+  /auth/oauth/native/{provider}/sdk/callback:
+    post:
+      consumes:
+      - application/json
+      description: Accepts provider access token from mobile SDK and returns FoodSea
+        auth tokens
+      parameters:
+      - description: OAuth provider
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: OAuth SDK callback payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_handler.OAuthNativeSDKCallbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Finish native OAuth SDK flow
+      tags:
+      - auth
+  /auth/oauth/native/{provider}/start:
+    get:
+      description: Builds provider auth URL and creates a native state token
+      parameters:
+      - description: OAuth provider
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: Native redirect URI
+        in: query
+        name: redirect_uri
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_identity_handler.OAuthStartResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Start native OAuth flow
       tags:
       - auth
   /auth/refresh:
@@ -1109,6 +1270,61 @@ paths:
           schema:
             $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
       summary: Get product by barcode
+      tags:
+      - Products
+  /products/photo-search:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Searches product candidates by image and OCR text
+      parameters:
+      - description: Product image (jpeg/png)
+        in: formData
+        name: image
+        required: true
+        type: file
+      - description: OCR text extracted on device
+        in: formData
+        name: ocr_text
+        required: true
+        type: string
+      - description: Top-K candidates, default 5
+        in: formData
+        name: top_k
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_photo_search_handler.searchByPhotoResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      summary: Search products by photo
       tags:
       - Products
   /search:

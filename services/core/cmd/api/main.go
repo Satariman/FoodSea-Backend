@@ -27,10 +27,12 @@ import (
 	"github.com/foodsea/core/internal/modules/identity"
 	"github.com/foodsea/core/internal/modules/images"
 	"github.com/foodsea/core/internal/modules/partners"
+	"github.com/foodsea/core/internal/modules/photo_search"
 	"github.com/foodsea/core/internal/modules/search"
 	"github.com/foodsea/core/internal/platform/cache"
 	"github.com/foodsea/core/internal/platform/config"
 	"github.com/foodsea/core/internal/platform/database"
+	"github.com/foodsea/core/internal/platform/grpcclient"
 	"github.com/foodsea/core/internal/platform/grpcserver"
 	"github.com/foodsea/core/internal/platform/kafka"
 	"github.com/foodsea/core/internal/platform/logger"
@@ -82,6 +84,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	mlClients, err := grpcclient.DialML(ctx, cfg.ML.GRPCAddr, log)
+	if err != nil {
+		log.Error("failed to initialise ML gRPC clients", "error", err, "addr", cfg.ML.GRPCAddr)
+		os.Exit(1)
+	}
+	defer func() {
+		if closeErr := mlClients.Close(); closeErr != nil {
+			log.Warn("failed to close ML gRPC clients", "error", closeErr)
+		}
+	}()
+
 	// ── Modules ───────────────────────────────────────────────────────────────
 
 	identityModule := identity.NewModule(identity.Deps{
@@ -123,6 +136,11 @@ func main() {
 		S3Client:  s3Client,
 		Logger:    log,
 	})
+	photoSearchModule := photo_search.NewModule(photo_search.Deps{
+		MLClient:      mlClients.Analog,
+		ProductLoader: catalogModule.ProductLoader(),
+		MaxImageBytes: cfg.PhotoSearch.MaxImageBytes,
+	})
 
 	// ── HTTP server ───────────────────────────────────────────────────────────
 
@@ -154,6 +172,7 @@ func main() {
 	searchModule.RegisterRoutes(public)
 	barcodeModule.RegisterRoutes(public)
 	cartModule.RegisterRoutes(protected)
+	photoSearchModule.RegisterRoutes(protected)
 	imagesModule.RegisterRoutes(admin)
 
 	httpServer := &http.Server{
