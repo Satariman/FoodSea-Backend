@@ -29,8 +29,13 @@ go.work.sum
 
 # Environment variables
 .env
+.env.*
 .env.local
 .env.*.local
+!.env.example
+!**/.env.example
+!.env.*.example
+!**/.env.*.example
 
 # Build artifacts
 dist/
