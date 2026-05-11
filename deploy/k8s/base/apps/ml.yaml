@@ -44,7 +44,7 @@ spec:
             - name: VOICE_INDEX_PATH
               value: /app/data/voice_index.pkl
             - name: VOICE_MIN_NGRAM_SCORE
-              value: "0.6"
+              value: "0.7"
             - name: VOICE_MAX_NGRAM_LEN
               value: "3"
             - name: VOICE_EMBEDDING_CACHE_SIZE

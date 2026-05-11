@@ -95,3 +95,23 @@ def test_parse_greedy_picks_compound_brand_over_unigrams():
     assert len(resp.items) == 1
     assert resp.items[0].product_id == "m"
     assert resp.items[0].raw_query == "молоко простоквашино"
+
+
+def test_parse_deduplicates_same_product_id_and_sums_quantity():
+    mapping = {"молоко": np.array([1.0, 0.0, 0.0])}
+    p = _make_pipeline(_index_three_products(), _gemini_for_words(mapping))
+    resp = asyncio.run(p.parse("молоко молоко молоко", "ru-RU"))
+    assert len(resp.items) == 1
+    assert resp.items[0].product_id == "m"
+    assert resp.items[0].quantity == 3
+    assert resp.items[0].raw_query == "молоко, молоко, молоко"
+
+
+def test_parse_keeps_separate_when_units_differ():
+    # Same product matched twice but under different units → keep distinct.
+    mapping = {"молока": np.array([1.0, 0.0, 0.0])}
+    p = _make_pipeline(_index_three_products(), _gemini_for_words(mapping))
+    resp = asyncio.run(p.parse("два литра молока три кило молока", "ru-RU"))
+    assert len(resp.items) == 2
+    units = sorted(item.unit for item in resp.items)
+    assert units == ["кг", "л"]

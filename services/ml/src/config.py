@@ -27,7 +27,7 @@ class Config:
         self.GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-embedding-2")
         self.GEMINI_OUTPUT_DIM = int(os.environ.get("GEMINI_OUTPUT_DIM", "768"))
         self.VOICE_INDEX_PATH = os.environ.get("VOICE_INDEX_PATH", "data/voice_index.pkl")
-        self.VOICE_MIN_NGRAM_SCORE = float(os.environ.get("VOICE_MIN_NGRAM_SCORE", "0.6"))
+        self.VOICE_MIN_NGRAM_SCORE = float(os.environ.get("VOICE_MIN_NGRAM_SCORE", "0.7"))
         self.VOICE_MAX_NGRAM_LEN = int(os.environ.get("VOICE_MAX_NGRAM_LEN", "3"))
         self.VOICE_GRPC_PORT = int(os.environ.get("VOICE_GRPC_PORT", "9094"))
         self.VOICE_EMBEDDING_CACHE_SIZE = int(os.environ.get("VOICE_EMBEDDING_CACHE_SIZE", "10000"))

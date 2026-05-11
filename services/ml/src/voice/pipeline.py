@@ -1,4 +1,5 @@
 import asyncio
+from collections import OrderedDict
 from dataclasses import dataclass
 
 from src.voice.matcher import NGramMatch, VoiceMatcher
@@ -55,7 +56,7 @@ class VoicePipeline:
                     confidence=nm.match.score,
                     raw_query=nm.ngram.text,
                 ))
-        return ParseResponse(items=items, unmatched_queries=unmatched)
+        return ParseResponse(items=self._deduplicate(items), unmatched_queries=unmatched)
 
     @staticmethod
     def _greedy_assign(matches: list[NGramMatch]) -> list[NGramMatch]:
@@ -70,3 +71,25 @@ class VoicePipeline:
             covered |= span
         chosen.sort(key=lambda nm: nm.ngram.start)
         return chosen
+
+    @staticmethod
+    def _deduplicate(items: list[VoiceItem]) -> list[VoiceItem]:
+        """Merge items with the same (product_id, unit): sum quantities, keep
+        highest confidence, concatenate raw queries. Preserves first-seen order.
+        """
+        merged: OrderedDict[tuple[str, str], VoiceItem] = OrderedDict()
+        for item in items:
+            key = (item.product_id, item.unit)
+            existing = merged.get(key)
+            if existing is None:
+                merged[key] = item
+                continue
+            merged[key] = VoiceItem(
+                product_id=existing.product_id,
+                product_name=existing.product_name,
+                quantity=existing.quantity + item.quantity,
+                unit=existing.unit,
+                confidence=max(existing.confidence, item.confidence),
+                raw_query=f"{existing.raw_query}, {item.raw_query}",
+            )
+        return list(merged.values())
