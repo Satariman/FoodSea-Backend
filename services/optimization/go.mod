@@ -18,7 +18,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
 	golang.org/x/sync v0.19.0
-	google.golang.org/grpc v1.67.0
+	google.golang.org/grpc v1.79.3
 )
 
 require (

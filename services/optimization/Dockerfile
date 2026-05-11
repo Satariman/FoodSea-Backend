@@ -9,7 +9,7 @@ COPY services/optimization ./services/optimization
 WORKDIR /app/services/optimization
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /service ./cmd/api
 
-FROM alpine:3.19
+FROM alpine:3.22
 RUN apk --no-cache add ca-certificates tzdata
 COPY --from=builder /service /service
 COPY services/optimization/migrations /migrations

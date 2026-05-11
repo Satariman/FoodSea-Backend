@@ -10,7 +10,7 @@ WORKDIR /app/services/core
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /service ./cmd/api
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /seed ./cmd/seed
 
-FROM alpine:3.19
+FROM alpine:3.22
 RUN apk --no-cache add ca-certificates tzdata
 COPY --from=builder /service /service
 COPY --from=builder /seed /seed
