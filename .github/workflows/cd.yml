@@ -178,6 +178,52 @@ jobs:
 
             deploy/scripts/deploy-k8s.sh
 
+      - name: Run tests on VM (dev)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/foodsea/backend-dev
+            git rev-parse HEAD
+
+            make test-all
+
+            check_code() {
+              local expected="$1"
+              local actual="$2"
+              local name="$3"
+              if [[ "${actual}" != "${expected}" ]]; then
+                echo "endpoint check failed: ${name} expected=${expected} actual=${actual}" >&2
+                exit 1
+              fi
+              echo "endpoint check passed: ${name} status=${actual}"
+            }
+
+            host="${{ secrets.DEV_HOST }}"
+            base="http://127.0.0.1"
+
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" "${base}/api/v1/categories")
+            check_code 200 "${code}" "GET /api/v1/categories"
+
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" "${base}/api/v1/search?q=milk")
+            check_code 200 "${code}" "GET /api/v1/search"
+
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" "${base}/api/v1/orders")
+            check_code 401 "${code}" "GET /api/v1/orders without token"
+
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" -H 'Content-Type: application/json' \
+              -X POST "${base}/api/v1/voice/parse" --data '{"text":"молоко"}')
+            check_code 401 "${code}" "POST /api/v1/voice/parse without token"
+
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" \
+              -X POST "${base}/api/v1/products/photo-search")
+            check_code 401 "${code}" "POST /api/v1/products/photo-search without token"
+
       - name: Release traceability summary
         run: |
           {
