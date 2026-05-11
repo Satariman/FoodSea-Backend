@@ -43,6 +43,16 @@ Thumbs.db
 # Logs
 *.log
 
+# Python cache / env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+services/ml/.venv/
+services/ml/*.egg-info/
+
 # Node (if any tooling)
 node_modules/
 
@@ -60,5 +70,11 @@ CLAUDE.md
 agents.md
 AGENTS.md
 reports/
+reports/generated_product_images/
+.tmp/
+input/
+shared/
+docs/collected-architecture-notes/
+*GitHub.txt
 **/architecture-notes*.md
 **/architecture_notes*.md
