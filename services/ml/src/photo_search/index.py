@@ -127,11 +127,22 @@ class PhotoProductIndex:
         source = Path(path)
         if not source.exists():
             return False
-        data = pickle.loads(source.read_bytes())
+        try:
+            data = pickle.loads(source.read_bytes())
+        except Exception:
+            return False
+        if not isinstance(data, dict):
+            return False
 
         file_provider = data.get("provider")
         file_model = data.get("model")
-        file_dim = int(data.get("dimensions", 0))
+        file_dim_raw = data.get("dimensions", 0)
+        if not isinstance(file_provider, str) or not isinstance(file_model, str):
+            return False
+        try:
+            file_dim = int(file_dim_raw)
+        except (TypeError, ValueError):
+            return False
         if file_provider != provider:
             return False
         if file_model != model:
@@ -139,18 +150,34 @@ class PhotoProductIndex:
         if file_dim != int(dimensions):
             return False
 
-        vectors = np.asarray(data.get("vectors"), dtype=np.float32)
+        try:
+            vectors = np.asarray(data.get("vectors"), dtype=np.float32)
+        except (TypeError, ValueError):
+            return False
         if vectors.ndim != 2:
-            raise ValueError("persisted vectors must be a 2D array")
+            return False
+        if vectors.shape[0] == 0:
+            return False
         if vectors.shape[1] != file_dim:
-            raise ValueError("incompatible dimensions in persisted index")
+            return False
 
-        metas = list(data.get("metas", []))
-        product_ids = list(data.get("product_ids", []))
+        metas_raw = data.get("metas")
+        product_ids_raw = data.get("product_ids")
+        if not isinstance(metas_raw, list) or not isinstance(product_ids_raw, list):
+            return False
+        if not all(isinstance(meta, PhotoProductMeta) for meta in metas_raw):
+            return False
+        if not all(isinstance(product_id, str) for product_id in product_ids_raw):
+            return False
+
+        metas = list(metas_raw)
+        product_ids = list(product_ids_raw)
         if len(metas) != vectors.shape[0]:
-            raise ValueError("persisted metas length must match vectors rows")
+            return False
         if len(product_ids) != len(metas):
-            raise ValueError("persisted product_ids length must match metas rows")
+            return False
+        if product_ids != [meta.product_id for meta in metas]:
+            return False
 
         self.product_ids = product_ids
         self.metas = metas

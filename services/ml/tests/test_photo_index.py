@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pickle
+
 import numpy as np
 
 from src.photo_search.index import PhotoProductIndex, PhotoProductMeta
@@ -92,3 +94,40 @@ def test_load_rejects_incompatible_metadata(tmp_path) -> None:
         )
         is False
     )
+
+
+def test_load_returns_false_for_malformed_payload(tmp_path) -> None:
+    path = tmp_path / "photo_index_malformed.pkl"
+    path.write_bytes(pickle.dumps(["not", "a", "dict"]))
+
+    restored = PhotoProductIndex()
+    assert restored.load(str(path), provider="clip", model="ViT-B/32", dimensions=3) is False
+
+
+def test_load_returns_false_for_empty_vectors_payload(tmp_path) -> None:
+    path = tmp_path / "photo_index_empty_vectors.pkl"
+    payload = {
+        "provider": "clip",
+        "model": "ViT-B/32",
+        "dimensions": 3,
+        "product_ids": [],
+        "metas": [],
+        "vectors": [],
+    }
+    path.write_bytes(pickle.dumps(payload))
+
+    restored = PhotoProductIndex()
+    assert restored.load(str(path), provider="clip", model="ViT-B/32", dimensions=3) is False
+
+
+def test_load_returns_false_for_inconsistent_product_id_mapping(tmp_path) -> None:
+    index = build_index()
+    path = tmp_path / "photo_index_inconsistent_ids.pkl"
+    index.save(str(path))
+
+    payload = pickle.loads(path.read_bytes())
+    payload["product_ids"] = ["x", "y", "z", "w"]
+    path.write_bytes(pickle.dumps(payload))
+
+    restored = PhotoProductIndex()
+    assert restored.load(str(path), provider="clip", model="ViT-B/32", dimensions=3) is False
