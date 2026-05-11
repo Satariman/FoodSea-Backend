@@ -74,6 +74,9 @@ reports/generated_product_images/
 .tmp/
 input/
 shared/
+docs/
+scripts/
+services/ml/scripts/
 docs/collected-architecture-notes/
 *GitHub.txt
 **/architecture-notes*.md

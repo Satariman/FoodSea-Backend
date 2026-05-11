@@ -3,4 +3,7 @@ grpcio-tools==1.62.2
 scikit-learn==1.5.1
 numpy==1.26.4
 protobuf==4.25.3
+sentence-transformers==3.0.1
+google-genai==1.7.0
+tenacity==9.0.0
 pytest==8.2.2

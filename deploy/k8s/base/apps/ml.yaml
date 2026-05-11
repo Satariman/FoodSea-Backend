@@ -24,6 +24,8 @@ spec:
           env:
             - name: GRPC_PORT
               value: "50051"
+            - name: CORE_GRPC_ADDR
+              value: core-service:9091
             - name: TEXT_WEIGHT
               value: "0.9"
             - name: CATEGORY_WEIGHT
@@ -52,6 +54,9 @@ spec:
           ports:
             - containerPort: 50051
               name: grpc
+          volumeMounts:
+            - name: ml-data
+              mountPath: /app/data
           resources:
             requests:
               cpu: 50m
@@ -59,6 +64,10 @@ spec:
             limits:
               cpu: 300m
               memory: 192Mi
+      volumes:
+        - name: ml-data
+          persistentVolumeClaim:
+            claimName: ml-service-data
 ---
 apiVersion: v1
 kind: Service
@@ -74,3 +83,16 @@ spec:
       port: 50051
       targetPort: 50051
   type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-service-data
+  labels:
+    app.kubernetes.io/name: ml-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
