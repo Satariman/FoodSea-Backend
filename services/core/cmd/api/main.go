@@ -79,8 +79,15 @@ func main() {
 
 	notificationsAPNSClient, err := notificationsapns.NewClient(cfg.APNS)
 	if err != nil {
-		log.Error("failed to initialise notifications APNS client", "error", err)
-		os.Exit(1)
+		if cfg.Env == "production" {
+			log.Error("failed to initialise notifications APNS client", "error", err)
+			os.Exit(1)
+		}
+		log.Warn("failed to initialise notifications APNS client, using noop client in non-production",
+			"error", err,
+			"env", cfg.Env,
+		)
+		notificationsAPNSClient = notificationsapns.NewNoopClient()
 	}
 
 	s3Client, err := s3platform.NewClient(ctx, s3platform.Config{

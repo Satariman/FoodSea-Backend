@@ -28,6 +28,12 @@ type Client struct {
 	production PushClient
 }
 
+type noopPushClient struct{}
+
+func (noopPushClient) Push(*apns2.Notification) (*apns2.Response, error) {
+	return &apns2.Response{StatusCode: 200}, nil
+}
+
 // NewClient creates a dual APNs client (sandbox + production) using token auth.
 func NewClient(cfg platformconfig.APNSConfig) (*Client, error) {
 	privateKey := strings.ReplaceAll(cfg.PrivateKey, "\\n", "\n")
@@ -48,6 +54,16 @@ func NewClient(cfg platformconfig.APNSConfig) (*Client, error) {
 		sandbox:    apns2.NewTokenClient(buildToken()).Development(),
 		production: apns2.NewTokenClient(buildToken()).Production(),
 	}, nil
+}
+
+// NewNoopClient returns a client that marks pushes as successful without sending them.
+// Useful in non-production environments when APNS credentials are intentionally absent.
+func NewNoopClient() *Client {
+	noop := noopPushClient{}
+	return &Client{
+		sandbox:    noop,
+		production: noop,
+	}
 }
 
 // NewClientWithPushers is intended for tests/custom transports.
