@@ -34,6 +34,7 @@ import (
 	"github.com/foodsea/core/internal/modules/catalog"
 	"github.com/foodsea/core/internal/modules/identity"
 	"github.com/foodsea/core/internal/modules/partners"
+	"github.com/foodsea/core/internal/modules/photo_search"
 	"github.com/foodsea/core/internal/modules/search"
 	"github.com/foodsea/core/internal/platform/cache"
 	"github.com/foodsea/core/internal/platform/config"
@@ -41,6 +42,8 @@ import (
 	"github.com/foodsea/core/internal/platform/grpcserver"
 	"github.com/foodsea/core/internal/platform/kafka"
 	"github.com/foodsea/core/internal/platform/middleware"
+	pbml "github.com/foodsea/proto/ml"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -49,6 +52,7 @@ var (
 	testGRPCAddr    string
 	testKafkaBroker string
 	testOAuthServer *httptest.Server
+	testMLClient    *fakeMLClient
 
 	seededProductID      string
 	seededProductBarcode = "4607025390015"
@@ -59,6 +63,25 @@ const (
 	testGoogleRedirectURI = "foodsea://oauth/google/callback"
 	testYandexRedirectURI = "foodsea://oauth/yandex/callback"
 )
+
+type fakeMLClient struct {
+	searchByPhotoFn func(context.Context, *pbml.SearchByPhotoRequest, ...grpc.CallOption) (*pbml.SearchByPhotoResponse, error)
+}
+
+func (f *fakeMLClient) GetAnalogs(context.Context, *pbml.GetAnalogsRequest, ...grpc.CallOption) (*pbml.GetAnalogsResponse, error) {
+	return &pbml.GetAnalogsResponse{}, nil
+}
+
+func (f *fakeMLClient) GetBatchAnalogs(context.Context, *pbml.GetBatchAnalogsRequest, ...grpc.CallOption) (*pbml.GetBatchAnalogsResponse, error) {
+	return &pbml.GetBatchAnalogsResponse{}, nil
+}
+
+func (f *fakeMLClient) SearchByPhoto(ctx context.Context, req *pbml.SearchByPhotoRequest, opts ...grpc.CallOption) (*pbml.SearchByPhotoResponse, error) {
+	if f.searchByPhotoFn == nil {
+		return &pbml.SearchByPhotoResponse{}, nil
+	}
+	return f.searchByPhotoFn(ctx, req, opts...)
+}
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
@@ -198,8 +221,11 @@ func run(ctx context.Context, m *testing.M) int {
 		Log:   log,
 		JWT:   jwtCfg,
 		OAuth: config.OAuthConfig{
-			StateTTL:            10 * time.Minute,
-			AllowedRedirectURIs: []string{testGoogleRedirectURI, testYandexRedirectURI},
+			StateTTL:                  10 * time.Minute,
+			AllowedRedirectURIs:       []string{testGoogleRedirectURI, testYandexRedirectURI},
+			NativeAllowedRedirectURIs: []string{testGoogleRedirectURI, testYandexRedirectURI},
+			LegacyEnabled:             true,
+			NativeEnabled:             true,
 			Google: config.OAuthProviderConfig{
 				Enabled:      true,
 				ClientID:     "google-client",
@@ -207,6 +233,13 @@ func run(ctx context.Context, m *testing.M) int {
 				AuthURL:      testOAuthServer.URL + "/google/auth",
 				TokenURL:     testOAuthServer.URL + "/google/token",
 				UserInfoURL:  testOAuthServer.URL + "/google/userinfo",
+			},
+			GoogleNative: config.OAuthProviderConfig{
+				Enabled:     true,
+				ClientID:    "google-native-client",
+				AuthURL:     testOAuthServer.URL + "/google/auth",
+				TokenURL:    testOAuthServer.URL + "/google/token",
+				UserInfoURL: testOAuthServer.URL + "/google/userinfo",
 			},
 			Yandex: config.OAuthProviderConfig{
 				Enabled:      true,
@@ -216,6 +249,7 @@ func run(ctx context.Context, m *testing.M) int {
 				TokenURL:     testOAuthServer.URL + "/yandex/token",
 				UserInfoURL:  testOAuthServer.URL + "/yandex/info",
 			},
+			YandexNativeSDKEnabled: true,
 		},
 	})
 	catalogMod := catalog.NewModule(catalog.Deps{
@@ -243,6 +277,22 @@ func run(ctx context.Context, m *testing.M) int {
 		ProductGetter: catalogMod.ProductGetter(),
 		Log:           log,
 	})
+	testMLClient = &fakeMLClient{
+		searchByPhotoFn: func(_ context.Context, _ *pbml.SearchByPhotoRequest, _ ...grpc.CallOption) (*pbml.SearchByPhotoResponse, error) {
+			return &pbml.SearchByPhotoResponse{
+				MatchedName:  "Молоко",
+				MatchedBrand: "ВкусВилл",
+				Candidates: []*pbml.PhotoSearchCandidate{
+					{ProductId: seededProductID, Score: 0.92},
+				},
+			}, nil
+		},
+	}
+	photoSearchMod := photo_search.NewModule(photo_search.Deps{
+		MLClient:      testMLClient,
+		ProductLoader: catalogMod.ProductLoader(),
+		MaxImageBytes: 8 * 1024 * 1024,
+	})
 
 	// ── HTTP router ───────────────────────────────────────────────────────────
 	router := gin.New()
@@ -262,6 +312,7 @@ func run(ctx context.Context, m *testing.M) int {
 	searchMod.RegisterRoutes(public)
 	barcodeMod.RegisterRoutes(public)
 	cartMod.RegisterRoutes(protected)
+	photoSearchMod.RegisterRoutes(protected)
 
 	srv := httptest.NewServer(router)
 	defer srv.Close()
