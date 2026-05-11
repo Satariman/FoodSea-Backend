@@ -5,16 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/foodsea/core/internal/modules/photo_search/domain"
 	sherrors "github.com/foodsea/core/internal/shared/errors"
 )
 
 const (
-	defaultTopK = 5
-	maxTopK     = 10
-	minOCRLen   = 3
-	maxOCRLen   = 4000
+	defaultTopK           = 5
+	maxTopK               = 10
+	minOCRLen             = 3
+	maxOCRLen             = 4000
+	defaultMLCallTimeout  = 5 * time.Second
 )
 
 type SearchByPhoto struct {
@@ -32,7 +34,10 @@ func (uc *SearchByPhoto) Execute(ctx context.Context, req domain.SearchByPhotoRe
 		return domain.SearchResult{}, err
 	}
 
-	mlResult, err := uc.client.SearchByPhoto(ctx, normalized)
+	mlCtx, cancel := context.WithTimeout(ctx, defaultMLCallTimeout)
+	defer cancel()
+
+	mlResult, err := uc.client.SearchByPhoto(mlCtx, normalized)
 	if err != nil {
 		return domain.SearchResult{}, err
 	}

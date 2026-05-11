@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -85,4 +86,33 @@ func TestSearchByPhoto_Validation(t *testing.T) {
 	var ve *sherrors.ValidationError
 	assert.True(t, errors.As(err, &ve))
 	assert.Equal(t, "ocr_text", ve.Field)
+}
+
+func TestSearchByPhoto_MLClientReceivesDeadlineContext(t *testing.T) {
+	client := &mockPhotoClient{}
+	loader := &mockProductLoader{}
+	uc := usecase.NewSearchByPhoto(client, loader)
+
+	productID := uuid.New()
+
+	client.On("SearchByPhoto", mock.MatchedBy(func(ctx context.Context) bool {
+		deadline, ok := ctx.Deadline()
+		return ok && time.Until(deadline) > 0
+	}), mock.Anything).Return(domain.SearchByPhotoResult{
+		Candidates: []domain.Candidate{
+			{ProductID: productID, Score: 0.77},
+		},
+	}, nil)
+	loader.On("Execute", mock.Anything, productID).Return(&catalogdomain.ProductDetail{
+		Product: catalogdomain.Product{ID: productID, Name: "Milk"},
+	}, nil)
+
+	result, err := uc.Execute(context.Background(), domain.SearchByPhotoRequest{
+		Image:         []byte("img"),
+		ImageMimeType: "image/jpeg",
+		OCRText:       "молоко 3.2",
+		TopK:          1,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Candidates, 1)
 }
