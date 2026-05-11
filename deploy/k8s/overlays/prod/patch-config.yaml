@@ -4,7 +4,7 @@ metadata:
   name: core-config
 data:
   ENV: production
-  S3_PUBLIC_BASE_URL: http://api.foodsea.example.com/product-images
+  S3_PUBLIC_BASE_URL: https://api.foodsea.example.com/product-images
 ---
 apiVersion: v1
 kind: ConfigMap

@@ -5,8 +5,13 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /api/v1/$1$2$3
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - foodsea.local
+      secretName: foodsea-app-tls
   rules:
     - host: foodsea.local
       http:
@@ -39,8 +44,13 @@ metadata:
   name: foodsea-minio-public
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /product-images/$2
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - foodsea.local
+      secretName: foodsea-app-tls
   rules:
     - host: foodsea.local
       http:
