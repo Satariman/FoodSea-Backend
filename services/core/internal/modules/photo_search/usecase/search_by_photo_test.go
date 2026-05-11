@@ -36,7 +36,7 @@ func (m *mockProductLoader) Execute(ctx context.Context, id uuid.UUID) (*catalog
 func TestSearchByPhoto_SkipsStaleProductsAndPreservesScoreOrder(t *testing.T) {
 	client := &mockPhotoClient{}
 	loader := &mockProductLoader{}
-	uc := usecase.NewSearchByPhoto(client, loader)
+	uc := usecase.NewSearchByPhoto(client, loader, 5*time.Second)
 
 	staleID := uuid.New()
 	firstID := uuid.New()
@@ -75,7 +75,7 @@ func TestSearchByPhoto_SkipsStaleProductsAndPreservesScoreOrder(t *testing.T) {
 }
 
 func TestSearchByPhoto_Validation(t *testing.T) {
-	uc := usecase.NewSearchByPhoto(&mockPhotoClient{}, &mockProductLoader{})
+	uc := usecase.NewSearchByPhoto(&mockPhotoClient{}, &mockProductLoader{}, 5*time.Second)
 
 	_, err := uc.Execute(context.Background(), domain.SearchByPhotoRequest{
 		Image:         []byte("img"),
@@ -91,7 +91,8 @@ func TestSearchByPhoto_Validation(t *testing.T) {
 func TestSearchByPhoto_MLClientReceivesDeadlineContext(t *testing.T) {
 	client := &mockPhotoClient{}
 	loader := &mockProductLoader{}
-	uc := usecase.NewSearchByPhoto(client, loader)
+	configuredTimeout := 1200 * time.Millisecond
+	uc := usecase.NewSearchByPhoto(client, loader, configuredTimeout)
 
 	productID := uuid.New()
 
@@ -101,7 +102,7 @@ func TestSearchByPhoto_MLClientReceivesDeadlineContext(t *testing.T) {
 			return false
 		}
 		until := time.Until(deadline)
-		return until >= 4500*time.Millisecond && until <= 5500*time.Millisecond
+		return until >= configuredTimeout-200*time.Millisecond && until <= configuredTimeout+200*time.Millisecond
 	}), mock.Anything).Return(domain.SearchByPhotoResult{
 		Candidates: []domain.Candidate{
 			{ProductID: productID, Score: 0.77},
@@ -124,7 +125,7 @@ func TestSearchByPhoto_MLClientReceivesDeadlineContext(t *testing.T) {
 func TestSearchByPhoto_MLUnavailableErrorPropagates(t *testing.T) {
 	client := &mockPhotoClient{}
 	loader := &mockProductLoader{}
-	uc := usecase.NewSearchByPhoto(client, loader)
+	uc := usecase.NewSearchByPhoto(client, loader, 5*time.Second)
 
 	client.On("SearchByPhoto", mock.Anything, mock.Anything).Return(domain.SearchByPhotoResult{}, sherrors.ErrUnavailable)
 
@@ -140,7 +141,7 @@ func TestSearchByPhoto_MLUnavailableErrorPropagates(t *testing.T) {
 func TestSearchByPhoto_SkipsInvalidProductIDCandidate(t *testing.T) {
 	client := &mockPhotoClient{}
 	loader := &mockProductLoader{}
-	uc := usecase.NewSearchByPhoto(client, loader)
+	uc := usecase.NewSearchByPhoto(client, loader, 5*time.Second)
 
 	validID := uuid.New()
 
@@ -168,7 +169,7 @@ func TestSearchByPhoto_SkipsInvalidProductIDCandidate(t *testing.T) {
 func TestSearchByPhoto_EmptyCandidatesReturnsEmptyResult(t *testing.T) {
 	client := &mockPhotoClient{}
 	loader := &mockProductLoader{}
-	uc := usecase.NewSearchByPhoto(client, loader)
+	uc := usecase.NewSearchByPhoto(client, loader, 5*time.Second)
 
 	client.On("SearchByPhoto", mock.Anything, mock.Anything).Return(domain.SearchByPhotoResult{
 		MatchedName:  "молоко",

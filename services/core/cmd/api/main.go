@@ -140,6 +140,7 @@ func main() {
 		MLClient:      mlClients.Analog,
 		ProductLoader: catalogModule.ProductLoader(),
 		MaxImageBytes: cfg.PhotoSearch.MaxImageBytes,
+		Timeout:       cfg.PhotoSearch.Timeout,
 	})
 
 	// ── HTTP server ───────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ package photo_search
 
 import (
 	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,6 +22,7 @@ type Deps struct {
 	MLClient      pbml.AnalogServiceClient
 	ProductLoader productLoader
 	MaxImageBytes int64
+	Timeout       time.Duration
 }
 
 type Module struct {
@@ -30,7 +32,7 @@ type Module struct {
 
 func NewModule(deps Deps) *Module {
 	mlClient := grpc.NewMLClient(deps.MLClient)
-	searchUC := usecase.NewSearchByPhoto(mlClient, deps.ProductLoader)
+	searchUC := usecase.NewSearchByPhoto(mlClient, deps.ProductLoader, deps.Timeout)
 	h := handler.NewHandler(searchUC, deps.MaxImageBytes)
 
 	return &Module{

@@ -18,16 +18,20 @@ const (
 	maxTopK               = 10
 	minOCRLen             = 3
 	maxOCRLen             = 4000
-	defaultMLCallTimeout  = 5 * time.Second
 )
 
 type SearchByPhoto struct {
 	client domain.PhotoSearchClient
 	loader domain.ProductLoader
+	timeout time.Duration
 }
 
-func NewSearchByPhoto(client domain.PhotoSearchClient, loader domain.ProductLoader) *SearchByPhoto {
-	return &SearchByPhoto{client: client, loader: loader}
+func NewSearchByPhoto(client domain.PhotoSearchClient, loader domain.ProductLoader, timeout time.Duration) *SearchByPhoto {
+	return &SearchByPhoto{
+		client:  client,
+		loader:  loader,
+		timeout: timeout,
+	}
 }
 
 func (uc *SearchByPhoto) Execute(ctx context.Context, req domain.SearchByPhotoRequest) (domain.SearchResult, error) {
@@ -36,7 +40,7 @@ func (uc *SearchByPhoto) Execute(ctx context.Context, req domain.SearchByPhotoRe
 		return domain.SearchResult{}, err
 	}
 
-	mlCtx, cancel := context.WithTimeout(ctx, defaultMLCallTimeout)
+	mlCtx, cancel := context.WithTimeout(ctx, uc.timeout)
 	defer cancel()
 
 	mlResult, err := uc.client.SearchByPhoto(mlCtx, normalized)
