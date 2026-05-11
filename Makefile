@@ -1,10 +1,16 @@
 .PHONY: all build generate proto swagger swagger-optimization test test-unit test-integration test-cover test-optimization test-e2e-core test-e2e-ordering test-e2e-optimization test-go-all test-swagger-regression test-ml test-all lint \
-        docker-build dev-infra-up dev-infra-down dev-core dev-ordering dev-all stop-all \
+        docker-build dev-infra-up dev-infra-down dev-core dev-ordering dev-all dev-oauth-all stop-all up down \
         k8s-render k8s-deploy k8s-down k8s-logs k8s-status \
         migrate-core migrate-optimization migrate-ordering migrate \
         atlas-diff-core atlas-diff-ordering atlas-hash \
         seed-core \
         tools
+
+ifneq (,$(wildcard .env.local))
+include .env.local
+endif
+
+SWAG ?= go run github.com/swaggo/swag/cmd/swag@v1.16.3
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
@@ -31,12 +37,12 @@ proto:
 	       proto/optimization/optimization.proto
 
 swagger:
-	cd services/core && swag init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
-	cd services/optimization && swag init -g cmd/api/main.go -o docs/swagger --parseDependency -q
-	cd services/ordering && swag init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
+	cd services/core && $(SWAG) init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
+	cd services/optimization && $(SWAG) init -g cmd/api/main.go -o docs/swagger --parseDependency -q
+	cd services/ordering && $(SWAG) init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
 
 swagger-optimization:
-	cd services/optimization && swag init -g cmd/api/main.go -o docs/swagger --parseDependency --parseInternal
+	cd services/optimization && $(SWAG) init -g cmd/api/main.go -o docs/swagger --parseDependency --parseInternal
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -160,6 +166,23 @@ CORE_DB_URL      ?= postgres://postgres:postgres@localhost:5433/core_db?sslmode=
 OPTIMIZATION_DB_URL ?= postgres://postgres:postgres@localhost:5434/optimization_db?sslmode=disable
 ORDERING_DB_URL  ?= postgres://postgres:postgres@localhost:5435/ordering_db?sslmode=disable
 DEV_STATE_DIR    ?= .dev
+OAUTH_STATE_TTL  ?= 10m
+OAUTH_ALLOWED_REDIRECT_URIS ?= http://localhost:3000/oauth/callback
+
+OAUTH_GOOGLE_ENABLED ?= false
+OAUTH_GOOGLE_CLIENT_ID ?=
+OAUTH_GOOGLE_CLIENT_SECRET ?=
+OAUTH_GOOGLE_AUTH_URL ?= https://accounts.google.com/o/oauth2/v2/auth
+OAUTH_GOOGLE_TOKEN_URL ?= https://oauth2.googleapis.com/token
+OAUTH_GOOGLE_SCOPES ?= openid,email,profile
+
+OAUTH_YANDEX_ENABLED ?= false
+OAUTH_YANDEX_CLIENT_ID ?=
+OAUTH_YANDEX_CLIENT_SECRET ?=
+OAUTH_YANDEX_AUTH_URL ?= https://oauth.yandex.ru/authorize
+OAUTH_YANDEX_TOKEN_URL ?= https://oauth.yandex.ru/token
+OAUTH_YANDEX_USERINFO_URL ?= https://login.yandex.ru/info
+OAUTH_YANDEX_SCOPES ?= login:email,login:avatar
 
 # ── Local infrastructure ─────────────────────────────────────────────────────
 
@@ -177,7 +200,7 @@ dev-core:
 	@until docker compose -f deploy/docker-compose.dev.yml exec -T core-db \
 	    pg_isready -U postgres -d core_db -q 2>/dev/null; do sleep 1; done
 	CORE_DB_URL=$(CORE_DB_URL) $(MAKE) migrate-core
-	cd services/core && swag init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
+	cd services/core && $(SWAG) init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
 	@echo "Swagger UI: http://localhost:8081/swagger/index.html"
 	cd services/core && air
 
@@ -187,7 +210,7 @@ dev-ordering:
 	@until docker compose -f deploy/docker-compose.dev.yml exec -T ordering-db \
 	    pg_isready -U postgres -d ordering_db -q 2>/dev/null; do sleep 1; done
 	ORDERING_DB_URL=$(ORDERING_DB_URL) $(MAKE) migrate-ordering
-	cd services/ordering && swag init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
+	cd services/ordering && $(SWAG) init -g cmd/api/swagger.go -o docs/swagger --parseDependency -q
 	@echo "Swagger UI: http://localhost:8083/swagger/index.html"
 	cd services/ordering && air
 
@@ -217,7 +240,7 @@ dev-all:
 	@if [ -f $(DEV_STATE_DIR)/core.pid ] && kill -0 $$(cat $(DEV_STATE_DIR)/core.pid) 2>/dev/null; then \
 		echo "core-service already running"; \
 	else \
-		(cd services/core; nohup env ENV=development SERVER_PORT=8081 GRPC_PORT=9091 DB_URL="$(CORE_DB_URL)" REDIS_URL=redis://localhost:6379/0 KAFKA_BROKERS=localhost:9092 JWT_SECRET=dev-secret-change-in-prod go run ./cmd/api > "$(CURDIR)/$(DEV_STATE_DIR)/core.log" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(DEV_STATE_DIR)/core.pid"); \
+		(cd services/core; nohup env ENV=development SERVER_PORT=8081 GRPC_PORT=9091 DB_URL="$(CORE_DB_URL)" REDIS_URL=redis://localhost:6379/0 KAFKA_BROKERS=localhost:9092 JWT_SECRET=dev-secret-change-in-prod OAUTH_STATE_TTL="$(OAUTH_STATE_TTL)" OAUTH_ALLOWED_REDIRECT_URIS="$(OAUTH_ALLOWED_REDIRECT_URIS)" OAUTH_GOOGLE_ENABLED="$(OAUTH_GOOGLE_ENABLED)" OAUTH_GOOGLE_CLIENT_ID="$(OAUTH_GOOGLE_CLIENT_ID)" OAUTH_GOOGLE_CLIENT_SECRET="$(OAUTH_GOOGLE_CLIENT_SECRET)" OAUTH_GOOGLE_AUTH_URL="$(OAUTH_GOOGLE_AUTH_URL)" OAUTH_GOOGLE_TOKEN_URL="$(OAUTH_GOOGLE_TOKEN_URL)" OAUTH_GOOGLE_SCOPES="$(OAUTH_GOOGLE_SCOPES)" OAUTH_YANDEX_ENABLED="$(OAUTH_YANDEX_ENABLED)" OAUTH_YANDEX_CLIENT_ID="$(OAUTH_YANDEX_CLIENT_ID)" OAUTH_YANDEX_CLIENT_SECRET="$(OAUTH_YANDEX_CLIENT_SECRET)" OAUTH_YANDEX_AUTH_URL="$(OAUTH_YANDEX_AUTH_URL)" OAUTH_YANDEX_TOKEN_URL="$(OAUTH_YANDEX_TOKEN_URL)" OAUTH_YANDEX_USERINFO_URL="$(OAUTH_YANDEX_USERINFO_URL)" OAUTH_YANDEX_SCOPES="$(OAUTH_YANDEX_SCOPES)" go run ./cmd/api > "$(CURDIR)/$(DEV_STATE_DIR)/core.log" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(DEV_STATE_DIR)/core.pid"); \
 	fi
 	@if [ -f $(DEV_STATE_DIR)/optimization.pid ] && kill -0 $$(cat $(DEV_STATE_DIR)/optimization.pid) 2>/dev/null; then \
 		echo "optimization-service already running"; \
@@ -234,6 +257,19 @@ dev-all:
 	@echo "Swagger Optimization: http://localhost:8082/swagger/index.html"
 	@echo "Swagger Ordering: http://localhost:8083/swagger/index.html"
 	@echo "Logs: $(DEV_STATE_DIR)/*.log"
+
+dev-oauth-all:
+	@if [ -z "$(OAUTH_GOOGLE_CLIENT_ID)" ]; then echo "OAUTH_GOOGLE_CLIENT_ID is required for dev-oauth-all"; exit 1; fi
+	@if [ -z "$(OAUTH_GOOGLE_CLIENT_SECRET)" ]; then echo "OAUTH_GOOGLE_CLIENT_SECRET is required for dev-oauth-all"; exit 1; fi
+	@if [ -z "$(OAUTH_YANDEX_CLIENT_ID)" ]; then echo "OAUTH_YANDEX_CLIENT_ID is required for dev-oauth-all"; exit 1; fi
+	@if [ -z "$(OAUTH_YANDEX_CLIENT_SECRET)" ]; then echo "OAUTH_YANDEX_CLIENT_SECRET is required for dev-oauth-all"; exit 1; fi
+	OAUTH_GOOGLE_ENABLED=true \
+	OAUTH_YANDEX_ENABLED=true \
+	$(MAKE) dev-all
+
+up: dev-all
+
+down: stop-all
 
 stop-all:
 	@if [ -f $(DEV_STATE_DIR)/ordering.pid ]; then \

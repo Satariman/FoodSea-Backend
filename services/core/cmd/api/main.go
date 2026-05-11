@@ -90,6 +90,7 @@ func main() {
 		Cache: redisCache,
 		Log:   log,
 		JWT:   cfg.JWT,
+		OAuth: cfg.OAuth,
 	})
 	partnersModule := partners.NewModule(partners.Deps{
 		Ent:   entClient,

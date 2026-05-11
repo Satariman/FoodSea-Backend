@@ -10,6 +10,7 @@ import (
 	"github.com/foodsea/core/ent/cartitem"
 	"github.com/foodsea/core/ent/category"
 	"github.com/foodsea/core/ent/deliverycondition"
+	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
 	"github.com/foodsea/core/ent/product"
 	"github.com/foodsea/core/ent/productnutrition"
@@ -114,6 +115,35 @@ func init() {
 	deliveryconditionDescID := deliveryconditionFields[0].Descriptor()
 	// deliverycondition.DefaultID holds the default value on creation for the id field.
 	deliverycondition.DefaultID = deliveryconditionDescID.Default.(func() uuid.UUID)
+	oauthidentityMixin := schema.OAuthIdentity{}.Mixin()
+	oauthidentityMixinHooks0 := oauthidentityMixin[0].Hooks()
+	oauthidentity.Hooks[0] = oauthidentityMixinHooks0[0]
+	oauthidentityMixinFields0 := oauthidentityMixin[0].Fields()
+	_ = oauthidentityMixinFields0
+	oauthidentityFields := schema.OAuthIdentity{}.Fields()
+	_ = oauthidentityFields
+	// oauthidentityDescCreatedAt is the schema descriptor for created_at field.
+	oauthidentityDescCreatedAt := oauthidentityMixinFields0[0].Descriptor()
+	// oauthidentity.DefaultCreatedAt holds the default value on creation for the created_at field.
+	oauthidentity.DefaultCreatedAt = oauthidentityDescCreatedAt.Default.(func() time.Time)
+	// oauthidentityDescUpdatedAt is the schema descriptor for updated_at field.
+	oauthidentityDescUpdatedAt := oauthidentityMixinFields0[1].Descriptor()
+	// oauthidentity.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	oauthidentity.DefaultUpdatedAt = oauthidentityDescUpdatedAt.Default.(func() time.Time)
+	// oauthidentity.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	oauthidentity.UpdateDefaultUpdatedAt = oauthidentityDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// oauthidentityDescProvider is the schema descriptor for provider field.
+	oauthidentityDescProvider := oauthidentityFields[1].Descriptor()
+	// oauthidentity.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	oauthidentity.ProviderValidator = oauthidentityDescProvider.Validators[0].(func(string) error)
+	// oauthidentityDescProviderUserID is the schema descriptor for provider_user_id field.
+	oauthidentityDescProviderUserID := oauthidentityFields[2].Descriptor()
+	// oauthidentity.ProviderUserIDValidator is a validator for the "provider_user_id" field. It is called by the builders before save.
+	oauthidentity.ProviderUserIDValidator = oauthidentityDescProviderUserID.Validators[0].(func(string) error)
+	// oauthidentityDescID is the schema descriptor for id field.
+	oauthidentityDescID := oauthidentityFields[0].Descriptor()
+	// oauthidentity.DefaultID holds the default value on creation for the id field.
+	oauthidentity.DefaultID = oauthidentityDescID.Default.(func() uuid.UUID)
 	offerFields := schema.Offer{}.Fields()
 	_ = offerFields
 	// offerDescDiscountPercent is the schema descriptor for discount_percent field.
@@ -218,10 +248,6 @@ func init() {
 	user.DefaultUpdatedAt = userDescUpdatedAt.Default.(func() time.Time)
 	// user.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	user.UpdateDefaultUpdatedAt = userDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// userDescPasswordHash is the schema descriptor for password_hash field.
-	userDescPasswordHash := userFields[3].Descriptor()
-	// user.PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
-	user.PasswordHashValidator = userDescPasswordHash.Validators[0].(func(string) error)
 	// userDescOnboardingDone is the schema descriptor for onboarding_done field.
 	userDescOnboardingDone := userFields[4].Descriptor()
 	// user.DefaultOnboardingDone holds the default value on creation for the onboarding_done field.

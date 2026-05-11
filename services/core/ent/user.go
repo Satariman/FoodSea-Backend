@@ -28,7 +28,7 @@ type User struct {
 	// Email holds the value of the "email" field.
 	Email *string `json:"email,omitempty"`
 	// PasswordHash holds the value of the "password_hash" field.
-	PasswordHash string `json:"password_hash,omitempty"`
+	PasswordHash *string `json:"password_hash,omitempty"`
 	// OnboardingDone holds the value of the "onboarding_done" field.
 	OnboardingDone bool `json:"onboarding_done,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -41,9 +41,11 @@ type User struct {
 type UserEdges struct {
 	// Cart holds the value of the cart edge.
 	Cart *Cart `json:"cart,omitempty"`
+	// OauthIdentities holds the value of the oauth_identities edge.
+	OauthIdentities []*OAuthIdentity `json:"oauth_identities,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // CartOrErr returns the Cart value or an error if the edge
@@ -55,6 +57,15 @@ func (e UserEdges) CartOrErr() (*Cart, error) {
 		return nil, &NotFoundError{label: cart.Label}
 	}
 	return nil, &NotLoadedError{edge: "cart"}
+}
+
+// OauthIdentitiesOrErr returns the OauthIdentities value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) OauthIdentitiesOrErr() ([]*OAuthIdentity, error) {
+	if e.loadedTypes[1] {
+		return e.OauthIdentities, nil
+	}
+	return nil, &NotLoadedError{edge: "oauth_identities"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -121,7 +132,8 @@ func (_m *User) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field password_hash", values[i])
 			} else if value.Valid {
-				_m.PasswordHash = value.String
+				_m.PasswordHash = new(string)
+				*_m.PasswordHash = value.String
 			}
 		case user.FieldOnboardingDone:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -145,6 +157,11 @@ func (_m *User) Value(name string) (ent.Value, error) {
 // QueryCart queries the "cart" edge of the User entity.
 func (_m *User) QueryCart() *CartQuery {
 	return NewUserClient(_m.config).QueryCart(_m)
+}
+
+// QueryOauthIdentities queries the "oauth_identities" edge of the User entity.
+func (_m *User) QueryOauthIdentities() *OAuthIdentityQuery {
+	return NewUserClient(_m.config).QueryOauthIdentities(_m)
 }
 
 // Update returns a builder for updating this User.
@@ -186,8 +203,10 @@ func (_m *User) String() string {
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
-	builder.WriteString("password_hash=")
-	builder.WriteString(_m.PasswordHash)
+	if v := _m.PasswordHash; v != nil {
+		builder.WriteString("password_hash=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("onboarding_done=")
 	builder.WriteString(fmt.Sprintf("%v", _m.OnboardingDone))

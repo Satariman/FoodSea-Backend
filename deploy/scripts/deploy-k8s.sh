@@ -48,6 +48,26 @@ create_secret() {
   kubectl -n "${NS}" create secret generic "${name}" "$@" --dry-run=client -o yaml | kubectl apply -f -
 }
 
+urlencode() {
+  local input="$1"
+  local output=""
+  local i char hex
+
+  LC_ALL=C
+  for ((i=0; i<${#input}; i++)); do
+    char="${input:i:1}"
+    case "${char}" in
+      [a-zA-Z0-9.~_-]) output+="${char}" ;;
+      *)
+        printf -v hex '%02X' "'${char}"
+        output+="%${hex}"
+        ;;
+    esac
+  done
+
+  printf "%s" "${output}"
+}
+
 kubectl apply -f "${OVERLAY}/namespace.yaml"
 
 CORE_DB_PASSWORD="${CORE_DB_PASSWORD:-$(secret_value core-secrets DB_PASSWORD)}"
@@ -56,21 +76,24 @@ ORDERING_DB_PASSWORD="${ORDERING_DB_PASSWORD:-$(secret_value ordering-secrets DB
 JWT_SECRET="${JWT_SECRET:-$(secret_value core-secrets JWT_SECRET)}"
 MINIO_ROOT_USER="${MINIO_ROOT_USER:-$(secret_value minio-secrets MINIO_ROOT_USER minioadmin)}"
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-$(secret_value minio-secrets MINIO_ROOT_PASSWORD)}"
+CORE_DB_PASSWORD_URLENC="$(urlencode "${CORE_DB_PASSWORD}")"
+OPTIMIZATION_DB_PASSWORD_URLENC="$(urlencode "${OPTIMIZATION_DB_PASSWORD}")"
+ORDERING_DB_PASSWORD_URLENC="$(urlencode "${ORDERING_DB_PASSWORD}")"
 
 create_secret core-secrets \
-  --from-literal=DB_URL="postgres://postgres:${CORE_DB_PASSWORD}@core-postgres:5432/core_db?sslmode=disable" \
+  --from-literal=DB_URL="postgres://postgres:${CORE_DB_PASSWORD_URLENC}@core-postgres:5432/core_db?sslmode=disable" \
   --from-literal=DB_USER=postgres \
   --from-literal=DB_PASSWORD="${CORE_DB_PASSWORD}" \
   --from-literal=JWT_SECRET="${JWT_SECRET}"
 
 create_secret optimization-secrets \
-  --from-literal=DB_URL="postgres://postgres:${OPTIMIZATION_DB_PASSWORD}@optimization-postgres:5432/optimization_db?sslmode=disable" \
+  --from-literal=DB_URL="postgres://postgres:${OPTIMIZATION_DB_PASSWORD_URLENC}@optimization-postgres:5432/optimization_db?sslmode=disable" \
   --from-literal=DB_USER=postgres \
   --from-literal=DB_PASSWORD="${OPTIMIZATION_DB_PASSWORD}" \
   --from-literal=JWT_SECRET="${JWT_SECRET}"
 
 create_secret ordering-secrets \
-  --from-literal=DB_URL="postgres://postgres:${ORDERING_DB_PASSWORD}@ordering-postgres:5432/ordering_db?sslmode=disable" \
+  --from-literal=DB_URL="postgres://postgres:${ORDERING_DB_PASSWORD_URLENC}@ordering-postgres:5432/ordering_db?sslmode=disable" \
   --from-literal=DB_USER=postgres \
   --from-literal=DB_PASSWORD="${ORDERING_DB_PASSWORD}" \
   --from-literal=JWT_SECRET="${JWT_SECRET}"

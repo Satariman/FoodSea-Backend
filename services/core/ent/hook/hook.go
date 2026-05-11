@@ -69,6 +69,18 @@ func (f DeliveryConditionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeliveryConditionMutation", m)
 }
 
+// The OAuthIdentityFunc type is an adapter to allow the use of ordinary
+// function as OAuthIdentity mutator.
+type OAuthIdentityFunc func(context.Context, *ent.OAuthIdentityMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OAuthIdentityFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OAuthIdentityMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OAuthIdentityMutation", m)
+}
+
 // The OfferFunc type is an adapter to allow the use of ordinary
 // function as Offer mutator.
 type OfferFunc func(context.Context, *ent.OfferMutation) (ent.Value, error)

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/foodsea/core/ent/cart"
+	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/predicate"
 	"github.com/foodsea/core/ent/user"
 	"github.com/google/uuid"
@@ -21,11 +22,12 @@ import (
 // UserQuery is the builder for querying User entities.
 type UserQuery struct {
 	config
-	ctx        *QueryContext
-	order      []user.OrderOption
-	inters     []Interceptor
-	predicates []predicate.User
-	withCart   *CartQuery
+	ctx                 *QueryContext
+	order               []user.OrderOption
+	inters              []Interceptor
+	predicates          []predicate.User
+	withCart            *CartQuery
+	withOauthIdentities *OAuthIdentityQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -77,6 +79,28 @@ func (_q *UserQuery) QueryCart() *CartQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(cart.Table, cart.FieldID),
 			sqlgraph.Edge(sqlgraph.O2O, false, user.CartTable, user.CartColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOauthIdentities chains the current query on the "oauth_identities" edge.
+func (_q *UserQuery) QueryOauthIdentities() *OAuthIdentityQuery {
+	query := (&OAuthIdentityClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(oauthidentity.Table, oauthidentity.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.OauthIdentitiesTable, user.OauthIdentitiesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -271,12 +295,13 @@ func (_q *UserQuery) Clone() *UserQuery {
 		return nil
 	}
 	return &UserQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]user.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.User{}, _q.predicates...),
-		withCart:   _q.withCart.Clone(),
+		config:              _q.config,
+		ctx:                 _q.ctx.Clone(),
+		order:               append([]user.OrderOption{}, _q.order...),
+		inters:              append([]Interceptor{}, _q.inters...),
+		predicates:          append([]predicate.User{}, _q.predicates...),
+		withCart:            _q.withCart.Clone(),
+		withOauthIdentities: _q.withOauthIdentities.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -291,6 +316,17 @@ func (_q *UserQuery) WithCart(opts ...func(*CartQuery)) *UserQuery {
 		opt(query)
 	}
 	_q.withCart = query
+	return _q
+}
+
+// WithOauthIdentities tells the query-builder to eager-load the nodes that are connected to
+// the "oauth_identities" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithOauthIdentities(opts ...func(*OAuthIdentityQuery)) *UserQuery {
+	query := (&OAuthIdentityClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOauthIdentities = query
 	return _q
 }
 
@@ -372,8 +408,9 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			_q.withCart != nil,
+			_q.withOauthIdentities != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -400,6 +437,13 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 			return nil, err
 		}
 	}
+	if query := _q.withOauthIdentities; query != nil {
+		if err := _q.loadOauthIdentities(ctx, query, nodes,
+			func(n *User) { n.Edges.OauthIdentities = []*OAuthIdentity{} },
+			func(n *User, e *OAuthIdentity) { n.Edges.OauthIdentities = append(n.Edges.OauthIdentities, e) }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
 }
 
@@ -415,6 +459,36 @@ func (_q *UserQuery) loadCart(ctx context.Context, query *CartQuery, nodes []*Us
 	}
 	query.Where(predicate.Cart(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(user.CartColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadOauthIdentities(ctx context.Context, query *OAuthIdentityQuery, nodes []*User, init func(*User), assign func(*User, *OAuthIdentity)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(oauthidentity.FieldUserID)
+	}
+	query.Where(predicate.OAuthIdentity(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.OauthIdentitiesColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {
