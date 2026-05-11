@@ -84,6 +84,7 @@ class PhotoSearchEngine:
                 score += 0.08
             if parsed.matched_name and item.meta.name == parsed.matched_name:
                 score += 0.12
+            score = max(0.0, min(1.0, score))
             candidates.append(PhotoSearchCandidateDTO(product_id=item.product_id, score=score))
 
         candidates.sort(key=lambda candidate: candidate.score, reverse=True)
@@ -92,4 +93,3 @@ class PhotoSearchEngine:
             matched_brand=parsed.matched_brand or "",
             candidates=candidates,
         )
-

@@ -83,12 +83,8 @@ def build_photo_search(config: Config) -> tuple[PhotoSearchEngine | None, PhotoS
                 dimensions=config.PHOTO_SEARCH_DIMENSIONS,
             )
         elif config.PHOTO_SEARCH_PROVIDER == "vertex_ai":
-            provider = VertexAIEmbeddingProvider(
-                project_id=config.VERTEX_PROJECT_ID,
-                location=config.VERTEX_LOCATION,
-                model=config.PHOTO_SEARCH_MODEL,
-                dimensions=config.PHOTO_SEARCH_DIMENSIONS,
-            )
+            logger.warning("photo search provider vertex_ai is not implemented yet")
+            return None, PhotoSearchState.UNREADY
         else:
             logger.warning("unknown photo search provider: %s", config.PHOTO_SEARCH_PROVIDER)
             return None, PhotoSearchState.UNREADY

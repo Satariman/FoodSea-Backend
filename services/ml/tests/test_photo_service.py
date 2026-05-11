@@ -5,6 +5,7 @@ import grpc
 
 from src.config import Config
 from src.index import AnalogIndex
+from src.main import build_photo_search
 from src.photo_search.index import PhotoProductIndex, PhotoProductMeta
 from src.photo_search.service import (
     PhotoSearchEngine,
@@ -88,6 +89,23 @@ def test_photo_search_returns_ranked_candidates_with_brand_name_bias() -> None:
         [candidate.score for candidate in result.candidates],
         reverse=True,
     )
+
+
+def test_photo_search_clamps_boosted_scores_into_unit_interval() -> None:
+    index = build_photo_index()
+    provider = StubEmbeddingProvider(vector=np.array([0.80, 0.20, 0.00], dtype=np.float32))
+    engine = PhotoSearchEngine(index=index, provider=provider, config=Config())
+
+    result = engine.search(
+        image=b"raw-image",
+        mime_type="image/jpeg",
+        ocr_text="coca cola zero sugar",
+        top_k=3,
+    )
+
+    assert result.candidates[0].product_id == "a"
+    assert result.candidates[0].score == 1.0
+    assert all(0.0 <= candidate.score <= 1.0 for candidate in result.candidates)
 
 
 def test_photo_search_raises_when_index_is_missing() -> None:
@@ -281,3 +299,41 @@ def test_search_by_photo_servicer_success_payload() -> None:
     assert response.matched_brand == "Coca Cola"
     assert [candidate.product_id for candidate in response.candidates] == ["a", "b", "c"]
     assert len(response.candidates) == 3
+
+
+def test_build_photo_search_vertex_provider_is_unready_and_servicer_returns_not_ready(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("PHOTO_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("PHOTO_SEARCH_PROVIDER", "vertex_ai")
+
+    photo_search, state = build_photo_search(Config())
+
+    assert photo_search is None
+    assert state == PhotoSearchState.UNREADY
+
+    analog_index = AnalogIndex()
+    analog_index.build(
+        product_ids=["x"],
+        names={"x": "X"},
+        vectors=np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
+        offers={"x": {"store1": 100}},
+    )
+    servicer = AnalogServicer(
+        index=analog_index,
+        config=Config(),
+        photo_search=photo_search,
+        photo_search_state=state,
+    )
+
+    ctx = DummyContext()
+    servicer.SearchByPhoto(
+        analogs_pb2.SearchByPhotoRequest(
+            image=b"1",
+            image_mime_type="image/png",
+            ocr_text="x",
+        ),
+        ctx,
+    )
+    assert ctx.code == grpc.StatusCode.FAILED_PRECONDITION
+    assert ctx.details == "photo search is not ready"
