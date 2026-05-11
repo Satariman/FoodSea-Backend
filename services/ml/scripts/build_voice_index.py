@@ -40,9 +40,9 @@ async def main() -> None:
         _ProductView(
             id=str(r.product_id),
             name=r.name,
-            brand=getattr(r, "brand_id", "") or "",
-            category=getattr(r, "category_id", "") or "",
-            image_url=getattr(r, "image_url", None),
+            brand=r.brand_name or "",
+            category=r.category_name or "",
+            image_url=r.image_url or None,
         )
         for r in raw
     ]

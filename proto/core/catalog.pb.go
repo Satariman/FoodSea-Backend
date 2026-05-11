@@ -116,6 +116,9 @@ type ProductFeaturesProto struct {
 	Fat           float64                `protobuf:"fixed64,11,opt,name=fat,proto3" json:"fat,omitempty"`
 	Carbohydrates float64                `protobuf:"fixed64,12,opt,name=carbohydrates,proto3" json:"carbohydrates,omitempty"`
 	Offers        []*ProductOfferBrief   `protobuf:"bytes,13,rep,name=offers,proto3" json:"offers,omitempty"`
+	ImageUrl      string                 `protobuf:"bytes,14,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	BrandName     string                 `protobuf:"bytes,15,opt,name=brand_name,json=brandName,proto3" json:"brand_name,omitempty"`
+	CategoryName  string                 `protobuf:"bytes,16,opt,name=category_name,json=categoryName,proto3" json:"category_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -241,6 +244,27 @@ func (x *ProductFeaturesProto) GetOffers() []*ProductOfferBrief {
 	return nil
 }
 
+func (x *ProductFeaturesProto) GetImageUrl() string {
+	if x != nil {
+		return x.ImageUrl
+	}
+	return ""
+}
+
+func (x *ProductFeaturesProto) GetBrandName() string {
+	if x != nil {
+		return x.BrandName
+	}
+	return ""
+}
+
+func (x *ProductFeaturesProto) GetCategoryName() string {
+	if x != nil {
+		return x.CategoryName
+	}
+	return ""
+}
+
 type ProductOfferBrief struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -300,7 +324,7 @@ const file_core_catalog_proto_rawDesc = "" +
 	"\x12core/catalog.proto\x12\x04core\"\x1a\n" +
 	"\x18ListProductsForMLRequest\"S\n" +
 	"\x19ListProductsForMLResponse\x126\n" +
-	"\bproducts\x18\x01 \x03(\v2\x1a.core.ProductFeaturesProtoR\bproducts\"\xa7\x03\n" +
+	"\bproducts\x18\x01 \x03(\v2\x1a.core.ProductFeaturesProtoR\bproducts\"\x88\x04\n" +
 	"\x14ProductFeaturesProto\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12\x12\n" +
@@ -317,7 +341,11 @@ const file_core_catalog_proto_rawDesc = "" +
 	" \x01(\x01R\aprotein\x12\x10\n" +
 	"\x03fat\x18\v \x01(\x01R\x03fat\x12$\n" +
 	"\rcarbohydrates\x18\f \x01(\x01R\rcarbohydrates\x12/\n" +
-	"\x06offers\x18\r \x03(\v2\x17.core.ProductOfferBriefR\x06offers\"S\n" +
+	"\x06offers\x18\r \x03(\v2\x17.core.ProductOfferBriefR\x06offers\x12\x1b\n" +
+	"\timage_url\x18\x0e \x01(\tR\bimageUrl\x12\x1d\n" +
+	"\n" +
+	"brand_name\x18\x0f \x01(\tR\tbrandName\x12#\n" +
+	"\rcategory_name\x18\x10 \x01(\tR\fcategoryName\"S\n" +
 	"\x11ProductOfferBrief\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12#\n" +
 	"\rprice_kopecks\x18\x02 \x01(\x03R\fpriceKopecks2f\n" +

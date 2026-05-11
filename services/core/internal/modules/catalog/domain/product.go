@@ -59,6 +59,9 @@ type ProductMLData struct {
 	SubcategoryID *uuid.UUID
 	BrandID       *uuid.UUID
 	Weight        *string
+	ImageURL      *string
+	BrandName     *string
+	CategoryName  string
 	Nutrition     *Nutrition
 	Offers        []OfferBrief
 }

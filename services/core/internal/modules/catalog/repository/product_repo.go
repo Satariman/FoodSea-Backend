@@ -84,6 +84,8 @@ func (r *ProductRepo) ListAllForML(ctx context.Context) ([]domain.ProductMLData,
 		WithOffers(func(q *ent.OfferQuery) {
 			q.Where(entoffer.InStock(true))
 		}).
+		WithBrand().
+		WithCategory().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing products for ml: %w", err)
@@ -100,6 +102,16 @@ func (r *ProductRepo) ListAllForML(ctx context.Context) ([]domain.ProductMLData,
 			SubcategoryID: row.SubcategoryID,
 			BrandID:       row.BrandID,
 			Weight:        row.Weight,
+			ImageURL:      row.ImageURL,
+		}
+
+		if row.Edges.Brand != nil {
+			bn := row.Edges.Brand.Name
+			item.BrandName = &bn
+		}
+
+		if row.Edges.Category != nil {
+			item.CategoryName = row.Edges.Category.Name
 		}
 
 		if row.Edges.Nutrition != nil {

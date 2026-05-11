@@ -27,6 +27,9 @@ class ProductData:
     carbohydrates: float
     offers: dict[str, int]
     min_price_kopecks: int
+    image_url: str = ""
+    brand_name: str = ""
+    category_name: str = ""
 
 
 class DataLoader:
@@ -61,6 +64,9 @@ class DataLoader:
                     carbohydrates=proto_product.carbohydrates,
                     offers=offers,
                     min_price_kopecks=min_price,
+                    image_url=proto_product.image_url,
+                    brand_name=proto_product.brand_name,
+                    category_name=proto_product.category_name,
                 )
             )
 

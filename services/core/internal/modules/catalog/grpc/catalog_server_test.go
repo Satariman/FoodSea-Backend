@@ -48,6 +48,8 @@ func TestCatalogServer_ListProductsForML_MapsDomainToProto(t *testing.T) {
 	description := "desc"
 	composition := "comp"
 	weight := "500 мл"
+	imageURL := "https://cdn.example/milk.jpg"
+	brandName := "Простоквашино"
 	subcategoryID := uuid.New()
 	brandID := uuid.New()
 	storeID := uuid.New()
@@ -63,6 +65,9 @@ func TestCatalogServer_ListProductsForML_MapsDomainToProto(t *testing.T) {
 				SubcategoryID: &subcategoryID,
 				BrandID:       &brandID,
 				Weight:        &weight,
+				ImageURL:      &imageURL,
+				BrandName:     &brandName,
+				CategoryName:  "Молочные продукты",
 				Nutrition: &domain.Nutrition{
 					Calories:      52.5,
 					Protein:       3.2,
@@ -91,6 +96,9 @@ func TestCatalogServer_ListProductsForML_MapsDomainToProto(t *testing.T) {
 	assert.Equal(t, "500 мл", p.Weight)
 	assert.Equal(t, subcategoryID.String(), p.SubcategoryId)
 	assert.Equal(t, brandID.String(), p.BrandId)
+	assert.Equal(t, "https://cdn.example/milk.jpg", p.ImageUrl)
+	assert.Equal(t, "Простоквашино", p.BrandName)
+	assert.Equal(t, "Молочные продукты", p.CategoryName)
 	require.Len(t, p.Offers, 1)
 	assert.Equal(t, storeID.String(), p.Offers[0].StoreId)
 	assert.Equal(t, int64(10990), p.Offers[0].PriceKopecks)

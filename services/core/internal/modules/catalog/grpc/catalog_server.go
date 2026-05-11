@@ -42,6 +42,9 @@ func (s *CatalogServer) ListProductsForML(ctx context.Context, _ *pb.ListProduct
 			SubcategoryId: uuidPtrToString(p.SubcategoryID),
 			BrandId:       uuidPtrToString(p.BrandID),
 			Weight:        strOrEmpty(p.Weight),
+			ImageUrl:      strOrEmpty(p.ImageURL),
+			BrandName:     strOrEmpty(p.BrandName),
+			CategoryName:  p.CategoryName,
 		}
 
 		if p.Nutrition != nil {
