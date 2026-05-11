@@ -46,13 +46,20 @@ def build_photo_index(
 ) -> PhotoProductIndex:
     metas: list[PhotoProductMeta] = []
     texts: list[str] = []
+    skipped_empty_text = 0
     for product in products:
         if not product.product_id:
             continue
+        text = product_text(product).strip()
+        if not text:
+            skipped_empty_text += 1
+            continue
         metas.append(meta_from_product(product))
-        texts.append(product_text(product))
+        texts.append(text)
 
     if not metas:
+        if skipped_empty_text:
+            raise ValueError("no valid products for photo index rebuild: all products have empty text")
         raise ValueError("no products available for photo index rebuild")
 
     batch = max(1, int(batch_size))

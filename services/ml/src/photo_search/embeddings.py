@@ -51,11 +51,7 @@ class GeminiAPIEmbeddingProvider:
                     "outputDimensionality": int(self.dimensions),
                 }
             )
-        return {
-            "model": f"models/{self.model}",
-            "config": {"outputDimensionality": int(self.dimensions)},
-            "requests": requests,
-        }
+        return {"requests": requests}
 
     def _build_multimodal_payload(self, items: list[dict[str, object]]) -> dict[str, object]:
         requests = []
@@ -83,11 +79,7 @@ class GeminiAPIEmbeddingProvider:
                     "outputDimensionality": int(self.dimensions),
                 }
             )
-        return {
-            "model": f"models/{self.model}",
-            "config": {"outputDimensionality": int(self.dimensions)},
-            "requests": requests,
-        }
+        return {"requests": requests}
 
     def _post_json(self, payload: dict[str, object]) -> dict[str, object]:
         body = json.dumps(payload).encode("utf-8")

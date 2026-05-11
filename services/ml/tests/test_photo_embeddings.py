@@ -41,11 +41,12 @@ def test_gemini_text_request_shape() -> None:
 
     payload = provider._build_texts_payload(["milk", "eggs"])
 
-    assert payload["model"] == "models/gemini-embedding-2"
-    assert payload["config"]["outputDimensionality"] == 32
+    assert set(payload.keys()) == {"requests"}
     assert payload["requests"][0]["content"]["parts"] == [{"text": "milk"}]
     assert payload["requests"][1]["content"]["parts"] == [{"text": "eggs"}]
     assert payload["requests"][0]["taskType"] == "SEMANTIC_SIMILARITY"
+    assert payload["requests"][0]["outputDimensionality"] == 32
+    assert payload["requests"][1]["outputDimensionality"] == 32
 
 
 def test_gemini_multimodal_request_shape() -> None:
@@ -62,6 +63,7 @@ def test_gemini_multimodal_request_shape() -> None:
         ]
     )
 
+    assert set(payload.keys()) == {"requests"}
     first_parts = payload["requests"][0]["content"]["parts"]
     assert first_parts[0] == {"text": "milk"}
     assert first_parts[1]["inlineData"]["mimeType"] == "image/png"

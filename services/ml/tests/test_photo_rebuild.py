@@ -100,6 +100,43 @@ def test_build_photo_index_with_fake_provider(tmp_path) -> None:
     assert provider.calls and len(provider.calls) == 2
 
 
+def test_build_photo_index_skips_products_with_empty_text(tmp_path) -> None:
+    provider = FakeProvider(dimensions=4)
+    products = [
+        _product("p-empty", name=" ", brand_name=" ", category_name=" ", subcategory_name=" ", description=" ", composition=" ", weight=" "),
+        _product("p-valid", name="Yogurt"),
+    ]
+    index_path = tmp_path / "photo_index_skip_empty.pkl"
+
+    index = build_photo_index(
+        products=products,
+        provider=provider,
+        index_path=str(index_path),
+        batch_size=16,
+    )
+
+    assert index_path.exists()
+    assert index.product_ids == ["p-valid"]
+    assert provider.calls == [["Yogurt | Brand | Dairy | Milk | Ultra pasteurized | Milk | 900 ml"]]
+
+
+def test_build_photo_index_fails_when_all_products_have_empty_text(tmp_path) -> None:
+    provider = FakeProvider(dimensions=4)
+    products = [
+        _product("p-empty-1", name=" ", brand_name=" ", category_name=" ", subcategory_name=" ", description=" ", composition=" ", weight=" "),
+        _product("p-empty-2", name="\t", brand_name="\n", category_name=" ", subcategory_name=" ", description=" ", composition=" ", weight=" "),
+    ]
+    index_path = tmp_path / "photo_index_empty.pkl"
+
+    with pytest.raises(ValueError, match="all products have empty text"):
+        build_photo_index(
+            products=products,
+            provider=provider,
+            index_path=str(index_path),
+            batch_size=8,
+        )
+
+
 def test_provider_from_config_gemini_requires_key() -> None:
     class Cfg:
         PHOTO_SEARCH_PROVIDER = "gemini_api_key"
