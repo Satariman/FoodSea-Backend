@@ -95,6 +95,8 @@ ORDERING_DB_PASSWORD="${ORDERING_DB_PASSWORD:-$(secret_value ordering-secrets DB
 JWT_SECRET="${JWT_SECRET:-$(secret_value core-secrets JWT_SECRET)}"
 MINIO_ROOT_USER="${MINIO_ROOT_USER:-$(secret_value minio-secrets MINIO_ROOT_USER minioadmin)}"
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-$(secret_value minio-secrets MINIO_ROOT_PASSWORD)}"
+EXISTING_GEMINI_API_KEY="$(kubectl -n "${NS}" get secret gemini-api-key -o "jsonpath={.data.api-key}" 2>/dev/null | base64 -d 2>/dev/null || true)"
+GEMINI_API_KEY="${GEMINI_API_KEY:-${EXISTING_GEMINI_API_KEY}}"
 
 CORE_DB_PASSWORD_URLENC="$(urlencode "${CORE_DB_PASSWORD}")"
 OPTIMIZATION_DB_PASSWORD_URLENC="$(urlencode "${OPTIMIZATION_DB_PASSWORD}")"
@@ -121,6 +123,9 @@ create_secret ordering-secrets \
 create_secret minio-secrets \
   --from-literal=MINIO_ROOT_USER="${MINIO_ROOT_USER}" \
   --from-literal=MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
+
+create_secret gemini-api-key \
+  --from-literal=api-key="${GEMINI_API_KEY}"
 
 if [[ -n "${REGISTRY_USERNAME:-}" && -n "${REGISTRY_PASSWORD:-}" ]]; then
   kubectl -n "${NS}" create secret docker-registry registry-credentials \

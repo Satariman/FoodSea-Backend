@@ -175,6 +175,13 @@ jobs:
             export REGISTRY_SERVER="ghcr.io"
             export REGISTRY_USERNAME="${{ github.actor }}"
             export REGISTRY_PASSWORD="${{ secrets.GHCR_READ_TOKEN }}"
+            export CORE_DB_PASSWORD="${{ secrets.CORE_DB_PASSWORD }}"
+            export OPTIMIZATION_DB_PASSWORD="${{ secrets.OPTIMIZATION_DB_PASSWORD }}"
+            export ORDERING_DB_PASSWORD="${{ secrets.ORDERING_DB_PASSWORD }}"
+            export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+            export MINIO_ROOT_USER="${{ secrets.MINIO_ROOT_USER }}"
+            export MINIO_ROOT_PASSWORD="${{ secrets.MINIO_ROOT_PASSWORD }}"
+            export GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
 
             deploy/scripts/deploy-k8s.sh
 
