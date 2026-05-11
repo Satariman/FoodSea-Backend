@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pickle
+
 import numpy as np
 import pytest
 
@@ -66,3 +68,11 @@ def test_load_rejects_incompatible_metadata(tmp_path) -> None:
     mismatched_model = PhotoProductIndex(provider="clip", model="ViT-L/14")
     with pytest.raises(ValueError, match="model"):
         mismatched_model.load(str(path))
+
+    payload = pickle.loads(path.read_bytes())
+    payload["dimensions"] = int(payload["dimensions"]) + 1
+    path.write_bytes(pickle.dumps(payload))
+
+    mismatched_dimensions = PhotoProductIndex(provider="clip", model="ViT-B/32")
+    with pytest.raises(ValueError, match="dimensions"):
+        mismatched_dimensions.load(str(path))
