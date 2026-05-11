@@ -6,9 +6,9 @@ import grpc
 import numpy as np
 
 from src.config import Config
-from src.index import AnalogIndex
+from src.analogs.index import AnalogIndex
+from src.analogs.servicer import AnalogServicer
 from src.proto import analogs_pb2, analogs_pb2_grpc
-from src.service import AnalogServicer
 
 
 def build_test_index() -> AnalogIndex:

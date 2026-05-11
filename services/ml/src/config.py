@@ -92,6 +92,16 @@ class Config:
         self.VOICE_EMBEDDING_CACHE_SIZE = _get_int_env(
             "VOICE_EMBEDDING_CACHE_SIZE", "10000", positive=True
         )
+        self.VOICE_RERANK_MODE = _get_enum_env(
+            "VOICE_RERANK_MODE",
+            "legacy",
+            allowed=("legacy", "attribute_aware"),
+        )
+        self.VOICE_RERANK_CANDIDATES_K = _get_int_env(
+            "VOICE_RERANK_CANDIDATES_K",
+            "5",
+            positive=True,
+        )
         self.PHOTO_SEARCH_ENABLED = _get_bool_env(
             "PHOTO_SEARCH_ENABLED", True, strict=True
         )
@@ -160,4 +170,20 @@ class Config:
         )
         self.PHOTO_SEARCH_BATCH_SIZE = _get_int_env(
             "PHOTO_SEARCH_BATCH_SIZE", "32", positive=True
+        )
+        self.SHARED_INDEX_PATH = os.getenv(
+            "SHARED_INDEX_PATH", "data/shared_embedding_index.pkl"
+        )
+        self.EMBEDDING_PROVIDER = os.getenv(
+            "EMBEDDING_PROVIDER",
+            self.PHOTO_SEARCH_PROVIDER,
+        )
+        self.EMBEDDING_MODEL = os.getenv(
+            "EMBEDDING_MODEL",
+            self.PHOTO_SEARCH_MODEL,
+        )
+        self.EMBEDDING_DIMENSIONS = _get_int_env(
+            "EMBEDDING_DIMENSIONS",
+            str(self.PHOTO_SEARCH_DIMENSIONS),
+            positive=True,
         )

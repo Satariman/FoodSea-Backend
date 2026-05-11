@@ -3,14 +3,21 @@
         k8s-render k8s-deploy k8s-down k8s-logs k8s-status \
         migrate-core migrate-optimization migrate-ordering migrate \
         visual-profiles gemini-images-test gemini-images-brand-samples gemini-images-all-brand-samples gemini-images-submit gemini-images-status gemini-images-download import-generated-images \
+        rebuild-ml-photo-index ml-index-rebuild ml-index-restart-ml ml-index-verify-ml ml-index-refresh \
         rebuild-photo-search-index photo-search-rebuild photo-search-restart-ml photo-search-verify-ml photo-search-refresh \
         atlas-diff-core atlas-diff-ordering atlas-hash \
         seed-core \
         tools
 
+ifneq (,$(wildcard .env.ml-index.local))
+include .env.ml-index.local
+endif
+
 ifneq (,$(wildcard .env.local))
 include .env.local
 endif
+
+export GEMINI_API_KEY
 
 SWAG ?= go run github.com/swaggo/swag/cmd/swag@v1.16.3
 
@@ -197,75 +204,82 @@ gemini-images-download:
 import-generated-images:
 	cd services/core && go run ./cmd/import-generated-images --manifest "$(IMAGE_IMPORT_MANIFEST)" --statuses "$(IMAGE_IMPORT_STATUSES)" $(IMAGE_IMPORT_EXTRA_ARGS)
 
-rebuild-photo-search-index:
+rebuild-ml-photo-index:
 	cd services/ml && $(MAKE) rebuild-photo-index
 
-photo-search-rebuild:
+ml-index-rebuild:
 	@set -e; \
-	if [ ! -f "$(PHOTO_SEARCH_ENV_FILE)" ]; then \
-		echo "Missing env file: $(PHOTO_SEARCH_ENV_FILE)"; \
-		echo "Create it from .env.photo-search.local.example"; \
+	if [ ! -f "$(ML_INDEX_ENV_FILE)" ]; then \
+		echo "Missing env file: $(ML_INDEX_ENV_FILE)"; \
+		echo "Create it from .env.ml-index.local.example"; \
 		exit 1; \
 	fi; \
-	set -a; . "$(PHOTO_SEARCH_ENV_FILE)"; set +a; \
+	set -a; . "$(ML_INDEX_ENV_FILE)"; set +a; \
 	if [ -z "$${GEMINI_API_KEY}" ]; then \
-		echo "GEMINI_API_KEY is required in $(PHOTO_SEARCH_ENV_FILE)"; \
+		echo "GEMINI_API_KEY is required in $(ML_INDEX_ENV_FILE)"; \
 		exit 1; \
 	fi; \
 	cd services/ml; \
 	.venv/bin/python -m src.photo_search.rebuild_index
 
-photo-search-restart-ml:
+ml-index-restart-ml:
 	@set -e; \
-	if [ ! -f "$(PHOTO_SEARCH_ENV_FILE)" ]; then \
-		echo "Missing env file: $(PHOTO_SEARCH_ENV_FILE)"; \
-		echo "Create it from .env.photo-search.local.example"; \
+	if [ ! -f "$(ML_INDEX_ENV_FILE)" ]; then \
+		echo "Missing env file: $(ML_INDEX_ENV_FILE)"; \
+		echo "Create it from .env.ml-index.local.example"; \
 		exit 1; \
 	fi; \
 	mkdir -p "$(DEV_STATE_DIR)"; \
-	if [ -f "$(PHOTO_SEARCH_ML_PID_FILE)" ] && kill -0 $$(cat "$(PHOTO_SEARCH_ML_PID_FILE)") 2>/dev/null; then \
-		kill $$(cat "$(PHOTO_SEARCH_ML_PID_FILE)") 2>/dev/null || true; \
+	if [ -f "$(ML_INDEX_ML_PID_FILE)" ] && kill -0 $$(cat "$(ML_INDEX_ML_PID_FILE)") 2>/dev/null; then \
+		kill $$(cat "$(ML_INDEX_ML_PID_FILE)") 2>/dev/null || true; \
 		sleep 1; \
 	fi; \
-	: > "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
-	set -a; . "$(PHOTO_SEARCH_ENV_FILE)"; set +a; \
-	(cd services/ml; nohup env CORE_GRPC_ADDR="$${CORE_GRPC_ADDR:-localhost:9091}" GRPC_PORT="$${GRPC_PORT:-50051}" .venv/bin/python -m src.main > "$(CURDIR)/$(PHOTO_SEARCH_ML_LOG_FILE)" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(PHOTO_SEARCH_ML_PID_FILE)"); \
-	echo "ml-service restarted, pid=$$(cat "$(PHOTO_SEARCH_ML_PID_FILE)")"
+	: > "$(ML_INDEX_ML_LOG_FILE)"; \
+	set -a; . "$(ML_INDEX_ENV_FILE)"; set +a; \
+	(cd services/ml; nohup env CORE_GRPC_ADDR="$${CORE_GRPC_ADDR:-localhost:9091}" GRPC_PORT="$${GRPC_PORT:-50051}" .venv/bin/python -m src.main > "$(CURDIR)/$(ML_INDEX_ML_LOG_FILE)" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(ML_INDEX_ML_PID_FILE)"); \
+	echo "ml-service restarted, pid=$$(cat "$(ML_INDEX_ML_PID_FILE)")"
 
-photo-search-verify-ml:
+ml-index-verify-ml:
 	@set -e; \
-	if [ ! -f "$(PHOTO_SEARCH_ML_PID_FILE)" ]; then \
-		echo "Missing pid file: $(PHOTO_SEARCH_ML_PID_FILE)"; \
+	if [ ! -f "$(ML_INDEX_ML_PID_FILE)" ]; then \
+		echo "Missing pid file: $(ML_INDEX_ML_PID_FILE)"; \
 		exit 1; \
 	fi; \
-	pid=$$(cat "$(PHOTO_SEARCH_ML_PID_FILE)"); \
+	pid=$$(cat "$(ML_INDEX_ML_PID_FILE)"); \
 	if ! kill -0 "$$pid" 2>/dev/null; then \
 		echo "ml-service is not running (pid=$$pid)"; \
 		echo "Last logs:"; \
-		tail -n 80 "$(PHOTO_SEARCH_ML_LOG_FILE)" || true; \
+		tail -n 80 "$(ML_INDEX_ML_LOG_FILE)" || true; \
 		exit 1; \
 	fi; \
-	attempts=$(PHOTO_SEARCH_READY_TIMEOUT_SECONDS); \
+	attempts=$(ML_INDEX_READY_TIMEOUT_SECONDS); \
 	while [ "$$attempts" -gt 0 ]; do \
-		if grep -q "photo search enabled with provider=" "$(PHOTO_SEARCH_ML_LOG_FILE)"; then \
+		if grep -q "photo search enabled with provider=" "$(ML_INDEX_ML_LOG_FILE)"; then \
 			echo "OK: photo search enabled"; \
-			tail -n 20 "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
+			tail -n 20 "$(ML_INDEX_ML_LOG_FILE)"; \
 			exit 0; \
 		fi; \
-		if grep -q "photo search index not loaded" "$(PHOTO_SEARCH_ML_LOG_FILE)" || grep -q "photo search provider is not configured" "$(PHOTO_SEARCH_ML_LOG_FILE)"; then \
+		if grep -q "photo search index not loaded" "$(ML_INDEX_ML_LOG_FILE)" || grep -q "photo search provider is not configured" "$(ML_INDEX_ML_LOG_FILE)"; then \
 			echo "Photo search is not ready. Check log lines below."; \
-			tail -n 80 "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
+			tail -n 80 "$(ML_INDEX_ML_LOG_FILE)"; \
 			exit 1; \
 		fi; \
 		sleep 1; \
 		attempts=$$((attempts - 1)); \
 	done; \
-	echo "Timeout waiting for photo search readiness ($(PHOTO_SEARCH_READY_TIMEOUT_SECONDS)s)"; \
-	tail -n 80 "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
+	echo "Timeout waiting for photo search readiness ($(ML_INDEX_READY_TIMEOUT_SECONDS)s)"; \
+	tail -n 80 "$(ML_INDEX_ML_LOG_FILE)"; \
 	exit 1
 
-photo-search-refresh: photo-search-rebuild photo-search-restart-ml photo-search-verify-ml
+ml-index-refresh: ml-index-rebuild ml-index-restart-ml ml-index-verify-ml
 	@echo "Photo-search index rebuilt, ml-service restarted, readiness verified."
+
+# Backward-compatible aliases.
+rebuild-photo-search-index: rebuild-ml-photo-index
+photo-search-rebuild: ml-index-rebuild
+photo-search-restart-ml: ml-index-restart-ml
+photo-search-verify-ml: ml-index-verify-ml
+photo-search-refresh: ml-index-refresh
 
 # ── Lint ─────────────────────────────────────────────────────────────────────
 
@@ -289,10 +303,14 @@ CORE_DB_URL      ?= postgres://postgres:postgres@localhost:5433/core_db?sslmode=
 OPTIMIZATION_DB_URL ?= postgres://postgres:postgres@localhost:5434/optimization_db?sslmode=disable
 ORDERING_DB_URL  ?= postgres://postgres:postgres@localhost:5435/ordering_db?sslmode=disable
 DEV_STATE_DIR    ?= .dev
-PHOTO_SEARCH_ENV_FILE ?= .env.photo-search.local
-PHOTO_SEARCH_ML_LOG_FILE ?= $(DEV_STATE_DIR)/ml.log
-PHOTO_SEARCH_ML_PID_FILE ?= $(DEV_STATE_DIR)/ml.pid
-PHOTO_SEARCH_READY_TIMEOUT_SECONDS ?= 45
+ML_INDEX_ENV_FILE ?= .env.ml-index.local
+PHOTO_SEARCH_ENV_FILE ?= $(ML_INDEX_ENV_FILE)
+ML_INDEX_ML_LOG_FILE ?= $(DEV_STATE_DIR)/ml.log
+ML_INDEX_ML_PID_FILE ?= $(DEV_STATE_DIR)/ml.pid
+ML_INDEX_READY_TIMEOUT_SECONDS ?= 45
+PHOTO_SEARCH_ML_LOG_FILE ?= $(ML_INDEX_ML_LOG_FILE)
+PHOTO_SEARCH_ML_PID_FILE ?= $(ML_INDEX_ML_PID_FILE)
+PHOTO_SEARCH_READY_TIMEOUT_SECONDS ?= $(ML_INDEX_READY_TIMEOUT_SECONDS)
 OAUTH_STATE_TTL  ?= 10m
 OAUTH_ALLOWED_REDIRECT_URIS ?= http://localhost:3000/oauth/callback
 OAUTH_NATIVE_ALLOWED_REDIRECT_URIS ?= app://foodsea/oauth/callback,http://localhost:3000/oauth/callback
@@ -379,7 +397,7 @@ dev-all:
 	@if [ -f $(DEV_STATE_DIR)/core.pid ] && kill -0 $$(cat $(DEV_STATE_DIR)/core.pid) 2>/dev/null; then \
 		echo "core-service already running"; \
 	else \
-		(cd services/core; nohup env ENV=development SERVER_PORT=8081 GRPC_PORT=9091 DB_URL="$(CORE_DB_URL)" REDIS_URL=redis://localhost:6379/0 KAFKA_BROKERS=localhost:9092 JWT_SECRET=dev-secret-change-in-prod OAUTH_STATE_TTL="$(OAUTH_STATE_TTL)" OAUTH_ALLOWED_REDIRECT_URIS="$(OAUTH_ALLOWED_REDIRECT_URIS)" OAUTH_NATIVE_ALLOWED_REDIRECT_URIS="$(OAUTH_NATIVE_ALLOWED_REDIRECT_URIS)" OAUTH_LEGACY_ENABLED="$(OAUTH_LEGACY_ENABLED)" OAUTH_NATIVE_ENABLED="$(OAUTH_NATIVE_ENABLED)" OAUTH_GOOGLE_ENABLED="$(OAUTH_GOOGLE_ENABLED)" OAUTH_GOOGLE_CLIENT_ID="$(OAUTH_GOOGLE_CLIENT_ID)" OAUTH_GOOGLE_CLIENT_SECRET="$(OAUTH_GOOGLE_CLIENT_SECRET)" OAUTH_GOOGLE_AUTH_URL="$(OAUTH_GOOGLE_AUTH_URL)" OAUTH_GOOGLE_TOKEN_URL="$(OAUTH_GOOGLE_TOKEN_URL)" OAUTH_GOOGLE_SCOPES="$(OAUTH_GOOGLE_SCOPES)" OAUTH_GOOGLE_NATIVE_CLIENT_ID="$(OAUTH_GOOGLE_NATIVE_CLIENT_ID)" OAUTH_GOOGLE_NATIVE_CLIENT_SECRET="$(OAUTH_GOOGLE_NATIVE_CLIENT_SECRET)" OAUTH_GOOGLE_NATIVE_AUTH_URL="$(OAUTH_GOOGLE_NATIVE_AUTH_URL)" OAUTH_GOOGLE_NATIVE_TOKEN_URL="$(OAUTH_GOOGLE_NATIVE_TOKEN_URL)" OAUTH_GOOGLE_NATIVE_SCOPES="$(OAUTH_GOOGLE_NATIVE_SCOPES)" OAUTH_YANDEX_ENABLED="$(OAUTH_YANDEX_ENABLED)" OAUTH_YANDEX_CLIENT_ID="$(OAUTH_YANDEX_CLIENT_ID)" OAUTH_YANDEX_CLIENT_SECRET="$(OAUTH_YANDEX_CLIENT_SECRET)" OAUTH_YANDEX_AUTH_URL="$(OAUTH_YANDEX_AUTH_URL)" OAUTH_YANDEX_TOKEN_URL="$(OAUTH_YANDEX_TOKEN_URL)" OAUTH_YANDEX_USERINFO_URL="$(OAUTH_YANDEX_USERINFO_URL)" OAUTH_YANDEX_SCOPES="$(OAUTH_YANDEX_SCOPES)" OAUTH_YANDEX_NATIVE_SDK_ENABLED="$(OAUTH_YANDEX_NATIVE_SDK_ENABLED)" go run ./cmd/api > "$(CURDIR)/$(DEV_STATE_DIR)/core.log" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(DEV_STATE_DIR)/core.pid"); \
+		(cd services/core; nohup env ENV=development SERVER_PORT=8081 GRPC_PORT=9091 DB_URL="$(CORE_DB_URL)" REDIS_URL=redis://localhost:6379/0 KAFKA_BROKERS=localhost:9092 JWT_SECRET=dev-secret-change-in-prod ML_GRPC_ADDR=localhost:50051 ML_SERVICE_VOICE_GRPC_ADDR=localhost:50051 OAUTH_STATE_TTL="$(OAUTH_STATE_TTL)" OAUTH_ALLOWED_REDIRECT_URIS="$(OAUTH_ALLOWED_REDIRECT_URIS)" OAUTH_NATIVE_ALLOWED_REDIRECT_URIS="$(OAUTH_NATIVE_ALLOWED_REDIRECT_URIS)" OAUTH_LEGACY_ENABLED="$(OAUTH_LEGACY_ENABLED)" OAUTH_NATIVE_ENABLED="$(OAUTH_NATIVE_ENABLED)" OAUTH_GOOGLE_ENABLED="$(OAUTH_GOOGLE_ENABLED)" OAUTH_GOOGLE_CLIENT_ID="$(OAUTH_GOOGLE_CLIENT_ID)" OAUTH_GOOGLE_CLIENT_SECRET="$(OAUTH_GOOGLE_CLIENT_SECRET)" OAUTH_GOOGLE_AUTH_URL="$(OAUTH_GOOGLE_AUTH_URL)" OAUTH_GOOGLE_TOKEN_URL="$(OAUTH_GOOGLE_TOKEN_URL)" OAUTH_GOOGLE_SCOPES="$(OAUTH_GOOGLE_SCOPES)" OAUTH_GOOGLE_NATIVE_CLIENT_ID="$(OAUTH_GOOGLE_NATIVE_CLIENT_ID)" OAUTH_GOOGLE_NATIVE_CLIENT_SECRET="$(OAUTH_GOOGLE_NATIVE_CLIENT_SECRET)" OAUTH_GOOGLE_NATIVE_AUTH_URL="$(OAUTH_GOOGLE_NATIVE_AUTH_URL)" OAUTH_GOOGLE_NATIVE_TOKEN_URL="$(OAUTH_GOOGLE_NATIVE_TOKEN_URL)" OAUTH_GOOGLE_NATIVE_SCOPES="$(OAUTH_GOOGLE_NATIVE_SCOPES)" OAUTH_YANDEX_ENABLED="$(OAUTH_YANDEX_ENABLED)" OAUTH_YANDEX_CLIENT_ID="$(OAUTH_YANDEX_CLIENT_ID)" OAUTH_YANDEX_CLIENT_SECRET="$(OAUTH_YANDEX_CLIENT_SECRET)" OAUTH_YANDEX_AUTH_URL="$(OAUTH_YANDEX_AUTH_URL)" OAUTH_YANDEX_TOKEN_URL="$(OAUTH_YANDEX_TOKEN_URL)" OAUTH_YANDEX_USERINFO_URL="$(OAUTH_YANDEX_USERINFO_URL)" OAUTH_YANDEX_SCOPES="$(OAUTH_YANDEX_SCOPES)" OAUTH_YANDEX_NATIVE_SDK_ENABLED="$(OAUTH_YANDEX_NATIVE_SDK_ENABLED)" go run ./cmd/api > "$(CURDIR)/$(DEV_STATE_DIR)/core.log" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(DEV_STATE_DIR)/core.pid"); \
 	fi
 	@if [ -f $(DEV_STATE_DIR)/optimization.pid ] && kill -0 $$(cat $(DEV_STATE_DIR)/optimization.pid) 2>/dev/null; then \
 		echo "optimization-service already running"; \
@@ -455,16 +473,19 @@ k8s-status:
 # ── Migrations ───────────────────────────────────────────────────────────────
 
 migrate-core:
+	GOWORK=off atlas migrate hash --dir "file://services/core/migrations"
 	atlas migrate apply \
 		--dir "file://services/core/migrations" \
 		--url "$(CORE_DB_URL)"
 
 migrate-optimization:
+	GOWORK=off atlas migrate hash --dir "file://services/optimization/migrations"
 	atlas migrate apply \
 		--dir "file://services/optimization/migrations" \
 		--url "$(OPTIMIZATION_DB_URL)"
 
 migrate-ordering:
+	GOWORK=off atlas migrate hash --dir "file://services/ordering/migrations"
 	atlas migrate apply \
 		--dir "file://services/ordering/migrations" \
 		--url "$(ORDERING_DB_URL)"
@@ -492,6 +513,8 @@ atlas-diff-ordering:
 
 atlas-hash:
 	GOWORK=off atlas migrate hash --dir "file://services/core/migrations"
+	GOWORK=off atlas migrate hash --dir "file://services/optimization/migrations"
+	GOWORK=off atlas migrate hash --dir "file://services/ordering/migrations"
 
 # ── Tools ────────────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import pytest
 from src.embeddings.cache import EmbeddingCache
 from src.voice.matcher import VoiceMatcher
 from src.voice.pipeline import VoicePipeline
-from src.voice_index.index import VoiceIndex
+from src.voice.index import VoiceIndex
 
 
 CATALOG = [

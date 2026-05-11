@@ -88,7 +88,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	mlVoiceAddr := getenv("ML_SERVICE_VOICE_GRPC_ADDR", "ml-service:50051")
+	// Prefer explicit voice addr; fallback to generic ML addr; local-safe default.
+	mlVoiceAddr := getenv("ML_SERVICE_VOICE_GRPC_ADDR", getenv("ML_GRPC_ADDR", "localhost:50051"))
 	mlVoiceConn, err := grpc.NewClient(mlVoiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Error("failed to dial ml-service voice gRPC", "error", err, "addr", mlVoiceAddr)

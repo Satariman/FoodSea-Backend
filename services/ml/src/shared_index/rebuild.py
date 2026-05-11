@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from src.config import Config
 from src.data_loader import DataLoader
-from src.photo_search.build_index import build_photo_index
 from src.shared_index.builder import (
     build_shared_index,
     build_weights_from_config,
@@ -16,24 +15,15 @@ def main() -> None:
     loader = DataLoader(config.CORE_GRPC_ADDR)
     products = loader.load_products()
     provider = provider_from_config(config)
-    build_weights = build_weights_from_config(config)
 
     profile, rows = build_shared_index(
         products=products,
         provider=provider,
         batch_size=config.PHOTO_SEARCH_BATCH_SIZE,
-        build_weights=build_weights,
+        build_weights=build_weights_from_config(config),
         index_mode=config.PHOTO_SEARCH_INDEX_MODE,
     )
     save_shared_index(config.SHARED_INDEX_PATH, profile, rows)
-
-    build_photo_index(
-        profile=profile,
-        rows=rows,
-        index_path=config.PHOTO_SEARCH_INDEX_PATH,
-        index_mode=config.PHOTO_SEARCH_INDEX_MODE,
-        build_weights=build_weights,
-    )
 
 
 if __name__ == "__main__":

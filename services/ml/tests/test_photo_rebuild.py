@@ -4,40 +4,17 @@ import numpy as np
 import pytest
 
 from src.data_loader import ProductData
-from src.photo_search.embeddings import GeminiAPIEmbeddingProvider, ProviderNotConfiguredError
-from src.photo_search.rebuild_index import (
+from src.photo_search.fusion import weighted_fuse
+from src.photo_search.build_index import (
     build_photo_index,
+    build_photo_index_from_shared_path,
+    fetch_image_bytes,
     main,
     meta_from_product,
     product_text,
-    provider_from_config,
 )
-
-
-class FakeProvider:
-    def __init__(self, dimensions: int = 4) -> None:
-        self.provider_name = "fake"
-        self.model = "fake-v1"
-        self.dimensions = dimensions
-        self.calls: list[list[str]] = []
-
-    def embed_texts(self, texts: list[str]) -> np.ndarray:
-        self.calls.append(list(texts))
-        rows = []
-        for i, _ in enumerate(texts):
-            row = np.zeros((self.dimensions,), dtype=np.float32)
-            row[i % self.dimensions] = 1.0
-            rows.append(row)
-        return np.stack(rows, axis=0)
-
-    def embed_multimodal(self, items):  # pragma: no cover - overridden where needed
-        rows = []
-        for item in items:
-            seed = len(str(item.get("text") or "")) + len(bytes(item.get("image_bytes") or b""))
-            row = np.zeros((self.dimensions,), dtype=np.float32)
-            row[seed % self.dimensions] = 1.0
-            rows.append(row)
-        return np.stack(rows, axis=0) if rows else np.empty((0, self.dimensions), dtype=np.float32)
+from src.shared_index.schema import SharedIndexMeta, SharedIndexProfile, SharedIndexRow
+from src.shared_index.store import save_shared_index
 
 
 def _product(
@@ -73,6 +50,27 @@ def _product(
     )
 
 
+def _meta(product_id: str, name: str) -> SharedIndexMeta:
+    return SharedIndexMeta(
+        product_id=product_id,
+        name=name,
+        brand_name="Brand",
+        category_name="Dairy",
+        subcategory_name="Milk",
+        image_url=f"https://example/{product_id}.jpg",
+    )
+
+
+def _profile(dimensions: int = 3) -> SharedIndexProfile:
+    return SharedIndexProfile(
+        provider="fake",
+        model="fake-v1",
+        dimensions=dimensions,
+        index_mode="weighted_multimodal",
+        build_weights={"image": 0.5, "name": 0.5},
+    )
+
+
 def test_product_text_and_meta_shape() -> None:
     product = _product("p-1")
 
@@ -86,248 +84,196 @@ def test_product_text_and_meta_shape() -> None:
     assert meta.image_url == "https://example/milk.jpg"
 
 
-def test_build_photo_index_with_fake_provider(tmp_path) -> None:
-    provider = FakeProvider(dimensions=4)
-    products = [_product("p-1"), _product("p-2", name="Yogurt")]
-    index_path = tmp_path / "photo_index.pkl"
+def test_build_photo_index_from_shared_rows_weighted_mode(tmp_path) -> None:
+    rows = [
+        SharedIndexRow(
+            meta=_meta("p-1", "Milk"),
+            channels={
+                "image": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+                "name": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+            },
+        ),
+        SharedIndexRow(
+            meta=_meta("p-2", "Yogurt"),
+            channels={
+                "image": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+                "name": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            },
+        ),
+    ]
+    weights = {"image": 0.8, "name": 0.2}
 
     index = build_photo_index(
-        products=products,
-        provider=provider,
-        index_path=str(index_path),
-        batch_size=1,
+        profile=_profile(),
+        rows=rows,
+        index_path=str(tmp_path / "photo_index_weighted.pkl"),
         index_mode="weighted_multimodal",
-        build_weights={
-            "image": 0.0,
-            "name": 1.0,
-            "brand": 0.0,
-            "category": 0.0,
-            "subcategory": 0.0,
-            "description": 0.0,
-            "composition": 0.0,
-            "weight": 0.0,
-            "full_text": 0.0,
-        },
+        build_weights=weights,
     )
 
-    assert index_path.exists()
-    assert index.provider == "fake"
-    assert index.model == "fake-v1"
-    assert index.dimensions == 4
+    expected = np.vstack([weighted_fuse(row.channels, weights) for row in rows])
     assert index.product_ids == ["p-1", "p-2"]
-    assert provider.calls and len(provider.calls) == 2
+    assert index.product_metas()[0].name == "Milk"
+    assert index.index_mode == "weighted_multimodal"
+    assert index.build_weights == {"image": 0.8, "name": 0.2}
+    assert np.allclose(index.vectors, expected, atol=1e-6)
 
 
-def test_build_photo_index_skips_products_with_empty_text(tmp_path) -> None:
-    provider = FakeProvider(dimensions=4)
-    products = [
-        _product("p-empty", name=" ", brand_name=" ", category_name=" ", subcategory_name=" ", description=" ", composition=" ", weight=" "),
-        _product("p-valid", name="Yogurt"),
+def test_build_photo_index_from_shared_rows_legacy_mode_uses_image_only(tmp_path) -> None:
+    rows = [
+        SharedIndexRow(
+            meta=_meta("p-1", "Milk"),
+            channels={
+                "image": np.array([0.0, 2.0, 0.0], dtype=np.float32),
+                "name": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            },
+        ),
+        SharedIndexRow(
+            meta=_meta("p-2", "Yogurt"),
+            channels={"name": np.array([1.0, 0.0, 0.0], dtype=np.float32)},
+        ),
     ]
-    index_path = tmp_path / "photo_index_skip_empty.pkl"
 
     index = build_photo_index(
-        products=products,
-        provider=provider,
-        index_path=str(index_path),
-        batch_size=16,
-        index_mode="weighted_multimodal",
-        build_weights={
-            "image": 0.0,
-            "name": 1.0,
-            "brand": 0.0,
-            "category": 0.0,
-            "subcategory": 0.0,
-            "description": 0.0,
-            "composition": 0.0,
-            "weight": 0.0,
-            "full_text": 0.0,
-        },
+        profile=_profile(),
+        rows=rows,
+        index_path=str(tmp_path / "photo_index_legacy.pkl"),
+        index_mode="legacy_image_only",
+        build_weights={"image": 1.0, "name": 0.0},
     )
 
-    assert index_path.exists()
-    assert index.product_ids == ["p-valid"]
-    assert provider.calls == [["Yogurt"]]
+    assert index.product_ids == ["p-1"]
+    assert index.index_mode == "legacy_image_only"
+    assert np.allclose(index.vectors, np.array([[0.0, 1.0, 0.0]], dtype=np.float32), atol=1e-6)
 
 
-def test_build_photo_index_fails_when_all_products_have_empty_text(tmp_path) -> None:
-    provider = FakeProvider(dimensions=4)
-    products = [
-        _product("p-empty-1", name=" ", brand_name=" ", category_name=" ", subcategory_name=" ", description=" ", composition=" ", weight=" "),
-        _product("p-empty-2", name="\t", brand_name="\n", category_name=" ", subcategory_name=" ", description=" ", composition=" ", weight=" "),
+def test_build_photo_index_from_shared_rows_fails_when_no_rows_match_mode(tmp_path) -> None:
+    rows = [
+        SharedIndexRow(
+            meta=_meta("p-1", "Milk"),
+            channels={"name": np.array([1.0, 0.0, 0.0], dtype=np.float32)},
+        ),
+        SharedIndexRow(
+            meta=_meta("p-2", "Yogurt"),
+            channels={},
+        ),
     ]
-    index_path = tmp_path / "photo_index_empty.pkl"
 
     with pytest.raises(ValueError, match="no valid products for photo index rebuild"):
         build_photo_index(
-            products=products,
-            provider=provider,
-            index_path=str(index_path),
-            batch_size=8,
-            index_mode="weighted_multimodal",
-            build_weights={
-                "image": 0.0,
-                "name": 1.0,
-                "brand": 0.0,
-                "category": 0.0,
-                "subcategory": 0.0,
-                "description": 0.0,
-                "composition": 0.0,
-                "weight": 0.0,
-                "full_text": 0.0,
-            },
+            profile=_profile(),
+            rows=rows,
+            index_path=str(tmp_path / "photo_index_no_valid_rows.pkl"),
+            index_mode="legacy_image_only",
+            build_weights={"image": 1.0},
         )
 
 
-def test_build_photo_index_weighted_multimodal_fallback_to_text_when_image_unavailable(
-    monkeypatch, tmp_path
-) -> None:
-    class FailingImageProvider(FakeProvider):
-        def embed_multimodal(self, items):
-            raise RuntimeError("image embedding failed")
-
-    provider = FailingImageProvider(dimensions=4)
-    products = [_product("p-1"), _product("p-2", name="Yogurt")]
-    index_path = tmp_path / "photo_index_weighted.pkl"
-    monkeypatch.setattr(
-        "src.photo_search.rebuild_index.fetch_image_bytes",
-        lambda url: (_ for _ in ()).throw(RuntimeError("download error")),
-    )
-
-    index = build_photo_index(
-        products=products,
-        provider=provider,
-        index_path=str(index_path),
-        batch_size=2,
-        index_mode="weighted_multimodal",
-        build_weights={
-            "image": 0.4,
-            "name": 0.6,
-            "brand": 0.0,
-            "category": 0.0,
-            "subcategory": 0.0,
-            "description": 0.0,
-            "composition": 0.0,
-            "weight": 0.0,
-            "full_text": 0.0,
-        },
-    )
-
-    assert index.product_ids == ["p-1", "p-2"]
-    assert index_path.exists()
-
-
-def test_build_photo_index_weighted_multimodal_skips_product_without_any_channels(tmp_path) -> None:
-    provider = FakeProvider(dimensions=4)
-    products = [
-        _product(
-            "p-invalid",
-            name=" ",
-            brand_name=" ",
-            category_name=" ",
-            subcategory_name=" ",
-            description=" ",
-            composition=" ",
-            weight=" ",
-            image_url="",
-        ),
-        _product("p-valid", name="Yogurt"),
+def test_build_photo_index_raises_for_unsupported_index_mode(tmp_path) -> None:
+    rows = [
+        SharedIndexRow(
+            meta=_meta("p-1", "Milk"),
+            channels={"image": np.array([1.0, 0.0, 0.0], dtype=np.float32)},
+        )
     ]
-    index = build_photo_index(
-        products=products,
-        provider=provider,
-        index_path=str(tmp_path / "photo_index_skip_invalid.pkl"),
-        batch_size=4,
-        index_mode="weighted_multimodal",
-        build_weights={
-            "image": 0.1,
-            "name": 0.9,
-            "brand": 0.0,
-            "category": 0.0,
-            "subcategory": 0.0,
-            "description": 0.0,
-            "composition": 0.0,
-            "weight": 0.0,
-            "full_text": 0.0,
-        },
-    )
-    assert index.product_ids == ["p-valid"]
+
+    with pytest.raises(ValueError, match="unsupported photo index mode"):
+        build_photo_index(
+            profile=_profile(),
+            rows=rows,
+            index_path=str(tmp_path / "photo_index_invalid_mode.pkl"),
+            index_mode="unknown_mode",
+            build_weights={"image": 1.0},
+        )
 
 
-def test_build_photo_index_legacy_image_only_path(monkeypatch, tmp_path) -> None:
-    class LegacyProvider(FakeProvider):
-        def __init__(self, dimensions: int = 4) -> None:
-            super().__init__(dimensions=dimensions)
-            self.mm_calls = 0
+def test_build_photo_index_from_shared_path_uses_loader_rows(tmp_path) -> None:
+    shared_path = tmp_path / "shared.pkl"
+    photo_path = tmp_path / "photo.pkl"
+    profile = _profile()
+    rows = [
+        SharedIndexRow(
+            meta=_meta("p-1", "Milk"),
+            channels={"image": np.array([1.0, 0.0, 0.0], dtype=np.float32)},
+        )
+    ]
+    save_shared_index(shared_path, profile, rows)
 
-        def embed_multimodal(self, items):
-            self.mm_calls += 1
-            rows = []
-            for i, _ in enumerate(items):
-                row = np.zeros((self.dimensions,), dtype=np.float32)
-                row[i % self.dimensions] = 1.0
-                rows.append(row)
-            return np.stack(rows, axis=0)
-
-    provider = LegacyProvider(dimensions=4)
-    monkeypatch.setattr(
-        "src.photo_search.rebuild_index.fetch_image_bytes",
-        lambda url: (b"img", "image/jpeg"),
-    )
-    products = [_product("p-1"), _product("p-2", name="Yogurt")]
-    index = build_photo_index(
-        products=products,
-        provider=provider,
-        index_path=str(tmp_path / "photo_index_legacy.pkl"),
-        batch_size=1,
+    index = build_photo_index_from_shared_path(
+        shared_index_path=shared_path,
+        index_path=str(photo_path),
         index_mode="legacy_image_only",
+        build_weights={"image": 1.0},
     )
-    assert index.product_ids == ["p-1", "p-2"]
-    assert provider.mm_calls == 2
+
+    assert photo_path.exists()
+    assert index.product_ids == ["p-1"]
 
 
-def test_provider_from_config_gemini_requires_key() -> None:
-    class Cfg:
-        PHOTO_SEARCH_PROVIDER = "gemini_api_key"
-        GEMINI_API_KEY = None
-        PHOTO_SEARCH_MODEL = "gemini-embedding-2"
-        PHOTO_SEARCH_DIMENSIONS = 32
-        VERTEX_PROJECT_ID = "project"
-        VERTEX_LOCATION = "us-central1"
+def test_build_photo_index_from_shared_path_propagates_invalid_shared_payload(tmp_path) -> None:
+    shared_path = tmp_path / "shared_corrupted.pkl"
+    shared_path.write_bytes(b"not-a-pickle")
 
-    with pytest.raises(ProviderNotConfiguredError):
-        provider_from_config(Cfg())
-
-
-def test_provider_from_config_gemini_ok() -> None:
-    class Cfg:
-        PHOTO_SEARCH_PROVIDER = "gemini_api_key"
-        GEMINI_API_KEY = "secret"
-        PHOTO_SEARCH_MODEL = "gemini-embedding-2"
-        PHOTO_SEARCH_DIMENSIONS = 32
-        VERTEX_PROJECT_ID = "project"
-        VERTEX_LOCATION = "us-central1"
-
-    provider = provider_from_config(Cfg())
-    assert isinstance(provider, GeminiAPIEmbeddingProvider)
-    assert provider.model == "gemini-embedding-2"
+    with pytest.raises(ValueError, match="invalid shared index payload"):
+        build_photo_index_from_shared_path(
+            shared_index_path=shared_path,
+            index_path=str(tmp_path / "photo.pkl"),
+            index_mode="legacy_image_only",
+            build_weights={"image": 1.0},
+        )
 
 
-def test_main_loads_products_and_saves_index(monkeypatch, tmp_path) -> None:
-    class FakeLoader:
-        def __init__(self, addr: str) -> None:
-            self.addr = addr
+def test_build_photo_index_from_shared_path_propagates_missing_shared_data(tmp_path) -> None:
+    import pickle
 
-        def load_products(self):
-            return [_product("p-1"), _product("p-2")]
+    shared_path = tmp_path / "shared_missing_rows.pkl"
+    shared_path.write_bytes(
+        pickle.dumps(
+            {
+                "profile": {
+                    "provider": "fake",
+                    "model": "fake-v1",
+                    "dimensions": 3,
+                    "index_mode": "weighted_multimodal",
+                    "build_weights": {"image": 1.0},
+                },
+            },
+        ),
+    )
+
+    with pytest.raises(ValueError, match="invalid rows"):
+        build_photo_index_from_shared_path(
+            shared_index_path=shared_path,
+            index_path=str(tmp_path / "photo.pkl"),
+            index_mode="legacy_image_only",
+            build_weights={"image": 1.0},
+        )
+
+
+def test_main_reads_shared_index_and_writes_photo_index_without_provider_calls(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    shared_path = tmp_path / "shared.pkl"
+    photo_path = tmp_path / "photo.pkl"
+    profile = _profile()
+    rows = [
+        SharedIndexRow(
+            meta=_meta("p-1", "Milk"),
+            channels={
+                "image": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+                "name": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+            },
+        ),
+    ]
+    save_shared_index(shared_path, profile, rows)
 
     class FakeConfig:
-        CORE_GRPC_ADDR = "localhost:9091"
-        PHOTO_SEARCH_INDEX_PATH = str(tmp_path / "rebuilt.pkl")
-        PHOTO_SEARCH_BATCH_SIZE = 2
+        SHARED_INDEX_PATH = str(shared_path)
+        PHOTO_SEARCH_INDEX_PATH = str(photo_path)
         PHOTO_SEARCH_INDEX_MODE = "weighted_multimodal"
-        PHOTO_SEARCH_BUILD_WEIGHT_IMAGE = 0.0
-        PHOTO_SEARCH_BUILD_WEIGHT_NAME = 1.0
+        PHOTO_SEARCH_BUILD_WEIGHT_IMAGE = 0.7
+        PHOTO_SEARCH_BUILD_WEIGHT_NAME = 0.3
         PHOTO_SEARCH_BUILD_WEIGHT_BRAND = 0.0
         PHOTO_SEARCH_BUILD_WEIGHT_CATEGORY = 0.0
         PHOTO_SEARCH_BUILD_WEIGHT_SUBCATEGORY = 0.0
@@ -336,15 +282,39 @@ def test_main_loads_products_and_saves_index(monkeypatch, tmp_path) -> None:
         PHOTO_SEARCH_BUILD_WEIGHT_WEIGHT = 0.0
         PHOTO_SEARCH_BUILD_WEIGHT_FULL_TEXT = 0.0
 
-    fake_provider = FakeProvider(dimensions=4)
-
-    monkeypatch.setattr("src.photo_search.rebuild_index.DataLoader", FakeLoader)
-    monkeypatch.setattr("src.photo_search.rebuild_index.Config", FakeConfig)
-    monkeypatch.setattr(
-        "src.photo_search.rebuild_index.provider_from_config",
-        lambda cfg: fake_provider,
-    )
+    monkeypatch.setattr("src.photo_search.build_index.Config", FakeConfig)
 
     main()
 
-    assert (tmp_path / "rebuilt.pkl").exists()
+    assert photo_path.exists()
+
+
+def test_fetch_image_bytes_percent_encodes_non_ascii_url(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    class _Response:
+        headers = {"Content-Type": "image/png"}
+
+        def read(self) -> bytes:
+            return b"img-bytes"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+            return None
+
+    def _urlopen(req, timeout):  # noqa: ANN001
+        captured["url"] = req.full_url
+        return _Response()
+
+    monkeypatch.setattr("src.photo_search.build_index.request.urlopen", _urlopen)
+
+    body, mime_type = fetch_image_bytes(
+        "http://localhost:9000/product-images/products/x/сметана-домик-в-деревне-20-315-г.png"
+    )
+
+    assert body == b"img-bytes"
+    assert mime_type == "image/png"
+    assert "сметана" not in captured["url"]
+    assert "%D1%81%D0%BC%D0%B5%D1%82%D0%B0%D0%BD%D0%B0" in captured["url"]

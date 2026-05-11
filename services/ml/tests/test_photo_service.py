@@ -4,7 +4,7 @@ import numpy as np
 import grpc
 
 from src.config import Config
-from src.index import AnalogIndex
+from src.analogs.index import AnalogIndex
 from src.main import build_photo_search
 from src.photo_search.index import PhotoProductIndex, PhotoProductMeta
 from src.photo_search.service import (
@@ -12,7 +12,7 @@ from src.photo_search.service import (
     PhotoSearchIndexNotReady,
 )
 from src.proto import analogs_pb2
-from src.service import AnalogServicer, PhotoSearchState
+from src.analogs.servicer import AnalogServicer, PhotoSearchState
 
 
 class StubEmbeddingProvider:

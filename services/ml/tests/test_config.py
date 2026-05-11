@@ -32,6 +32,12 @@ def test_photo_search_defaults(monkeypatch) -> None:
     monkeypatch.delenv("PHOTO_SEARCH_QUERY_WEIGHT_OCR_VOLUME", raising=False)
     monkeypatch.delenv("PHOTO_SEARCH_MIN_SCORE", raising=False)
     monkeypatch.delenv("PHOTO_SEARCH_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("SHARED_INDEX_PATH", raising=False)
+    monkeypatch.delenv("EMBEDDING_PROVIDER", raising=False)
+    monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("EMBEDDING_DIMENSIONS", raising=False)
+    monkeypatch.delenv("VOICE_RERANK_MODE", raising=False)
+    monkeypatch.delenv("VOICE_RERANK_CANDIDATES_K", raising=False)
 
     cfg = Config()
 
@@ -61,6 +67,12 @@ def test_photo_search_defaults(monkeypatch) -> None:
     assert cfg.PHOTO_SEARCH_QUERY_WEIGHT_OCR_VOLUME == 0.10
     assert cfg.PHOTO_SEARCH_MIN_SCORE == 0.25
     assert cfg.PHOTO_SEARCH_BATCH_SIZE == 32
+    assert cfg.SHARED_INDEX_PATH == "data/shared_embedding_index.pkl"
+    assert cfg.EMBEDDING_PROVIDER == "gemini_api_key"
+    assert cfg.EMBEDDING_MODEL == "gemini-embedding-2"
+    assert cfg.EMBEDDING_DIMENSIONS == 768
+    assert cfg.VOICE_RERANK_MODE == "legacy"
+    assert cfg.VOICE_RERANK_CANDIDATES_K == 5
 
 
 def test_photo_search_env_overrides(monkeypatch) -> None:
@@ -90,6 +102,12 @@ def test_photo_search_env_overrides(monkeypatch) -> None:
     monkeypatch.setenv("PHOTO_SEARCH_QUERY_WEIGHT_OCR_VOLUME", "0.62")
     monkeypatch.setenv("PHOTO_SEARCH_MIN_SCORE", "0.4")
     monkeypatch.setenv("PHOTO_SEARCH_BATCH_SIZE", "64")
+    monkeypatch.setenv("SHARED_INDEX_PATH", "/tmp/shared.pkl")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "vertex_ai")
+    monkeypatch.setenv("EMBEDDING_MODEL", "embed-custom")
+    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "512")
+    monkeypatch.setenv("VOICE_RERANK_MODE", "attribute_aware")
+    monkeypatch.setenv("VOICE_RERANK_CANDIDATES_K", "7")
 
     cfg = Config()
 
@@ -119,6 +137,12 @@ def test_photo_search_env_overrides(monkeypatch) -> None:
     assert cfg.PHOTO_SEARCH_QUERY_WEIGHT_OCR_VOLUME == 0.62
     assert cfg.PHOTO_SEARCH_MIN_SCORE == 0.4
     assert cfg.PHOTO_SEARCH_BATCH_SIZE == 64
+    assert cfg.SHARED_INDEX_PATH == "/tmp/shared.pkl"
+    assert cfg.EMBEDDING_PROVIDER == "vertex_ai"
+    assert cfg.EMBEDDING_MODEL == "embed-custom"
+    assert cfg.EMBEDDING_DIMENSIONS == 512
+    assert cfg.VOICE_RERANK_MODE == "attribute_aware"
+    assert cfg.VOICE_RERANK_CANDIDATES_K == 7
 
 
 @pytest.mark.parametrize("raw", ["1", "true", "yes", "on"])
@@ -198,6 +222,8 @@ def test_float_values_must_be_finite(monkeypatch, env_name: str, value: str) -> 
         ("GRPC_PORT", "0"),
         ("PHOTO_SEARCH_DIMENSIONS", "-10"),
         ("PHOTO_SEARCH_BATCH_SIZE", "0"),
+        ("EMBEDDING_DIMENSIONS", "0"),
+        ("VOICE_RERANK_CANDIDATES_K", "0"),
     ],
 )
 def test_positive_integer_fields(monkeypatch, env_name: str, value: str) -> None:
@@ -220,3 +246,18 @@ def test_photo_search_index_mode_accepted_values(monkeypatch) -> None:
 
     monkeypatch.setenv("PHOTO_SEARCH_INDEX_MODE", "weighted_multimodal")
     assert Config().PHOTO_SEARCH_INDEX_MODE == "weighted_multimodal"
+
+
+def test_voice_rerank_mode_enum_validation(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_RERANK_MODE", "bad_mode")
+
+    with pytest.raises(ValueError, match="VOICE_RERANK_MODE"):
+        Config()
+
+
+def test_voice_rerank_mode_accepted_values(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_RERANK_MODE", "legacy")
+    assert Config().VOICE_RERANK_MODE == "legacy"
+
+    monkeypatch.setenv("VOICE_RERANK_MODE", "attribute_aware")
+    assert Config().VOICE_RERANK_MODE == "attribute_aware"

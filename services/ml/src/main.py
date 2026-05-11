@@ -6,13 +6,13 @@ import logging
 from concurrent import futures
 
 import grpc
+import numpy as np
 
 from src.config import Config
 from src.data_loader import DataLoader
 from src.embeddings.cache import EmbeddingCache
-from src.embeddings.gemini_client import GeminiClient
-from src.feature_builder import FeatureBuilder
-from src.index import AnalogIndex
+from src.analogs.feature_builder import FeatureBuilder
+from src.analogs.index import AnalogIndex
 from src.proto import analogs_pb2_grpc, voice_pb2_grpc
 from src.photo_search.embeddings import (
     GeminiAPIEmbeddingProvider,
@@ -20,10 +20,11 @@ from src.photo_search.embeddings import (
 )
 from src.photo_search.index import PhotoProductIndex
 from src.photo_search.service import PhotoSearchEngine
-from src.service import AnalogServicer, PhotoSearchState, VoiceServicer
+from src.analogs.servicer import AnalogServicer, PhotoSearchState
+from src.voice.servicer import VoiceServicer
 from src.voice.matcher import VoiceMatcher
 from src.voice.pipeline import VoicePipeline
-from src.voice_index.index import VoiceIndex
+from src.voice.index import VoiceIndex
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -97,22 +98,71 @@ def register_voice_servicer(server: grpc.Server, config: Config) -> None:
             config.VOICE_INDEX_PATH,
         )
         return
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "voice_index.pkl cannot be loaded from %s; VoiceServicer NOT registered: %s",
+            config.VOICE_INDEX_PATH,
+            exc,
+        )
+        return
 
     if not config.GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY is not configured; VoiceServicer NOT registered")
         return
 
-    gemini = GeminiClient(
-        api_key=config.GEMINI_API_KEY,
-        model=config.GEMINI_MODEL,
-        output_dim=config.GEMINI_OUTPUT_DIM,
-    )
+    if not isinstance(voice_index, VoiceIndex):
+        logger.warning("voice index payload has invalid type; VoiceServicer NOT registered")
+        return
+
+    vectors = getattr(voice_index, "vectors", None)
+    if not isinstance(vectors, np.ndarray) or vectors.ndim != 2 or vectors.shape[1] <= 0:
+        logger.warning("voice index payload has invalid vectors; VoiceServicer NOT registered")
+        return
+
+    source_dimensions = int(getattr(voice_index, "source_dimensions", 0) or 0)
+    source_provider = str(getattr(voice_index, "source_provider", "") or "")
+    source_model = str(getattr(voice_index, "source_model", "") or "")
+    index_dimensions = int(source_dimensions or vectors.shape[1])
+    if index_dimensions != config.GEMINI_OUTPUT_DIM:
+        logger.warning(
+            "voice index embedding dimensions mismatch: index=%d runtime=%d; VoiceServicer NOT registered",
+            index_dimensions,
+            config.GEMINI_OUTPUT_DIM,
+        )
+        return
+    if source_provider and source_provider != "gemini_api_key":
+        logger.warning(
+            "voice index provider mismatch: index=%s runtime=gemini_api_key; VoiceServicer NOT registered",
+            source_provider,
+        )
+        return
+    if source_model and source_model != config.GEMINI_MODEL:
+        logger.warning(
+            "voice index model mismatch: index=%s runtime=%s; VoiceServicer NOT registered",
+            source_model,
+            config.GEMINI_MODEL,
+        )
+        return
+
+    try:
+        from src.embeddings.gemini_client import GeminiClient
+
+        gemini = GeminiClient(
+            api_key=config.GEMINI_API_KEY,
+            model=config.GEMINI_MODEL,
+            output_dim=config.GEMINI_OUTPUT_DIM,
+        )
+    except ImportError as exc:
+        logger.warning("voice embedding dependency is unavailable; VoiceServicer NOT registered: %s", exc)
+        return
     matcher = VoiceMatcher(
         index=voice_index,
         gemini=gemini,
         cache=EmbeddingCache(max_size=config.VOICE_EMBEDDING_CACHE_SIZE),
         min_score=config.VOICE_MIN_NGRAM_SCORE,
         max_ngram_len=config.VOICE_MAX_NGRAM_LEN,
+        rerank_mode=config.VOICE_RERANK_MODE,
+        rerank_candidates_k=config.VOICE_RERANK_CANDIDATES_K,
     )
     voice_pipeline = VoicePipeline(matcher=matcher)
     voice_pb2_grpc.add_VoiceServiceServicer_to_server(
@@ -128,6 +178,17 @@ def build_photo_search(config: Config) -> tuple[PhotoSearchEngine | None, PhotoS
     if not config.PHOTO_SEARCH_ENABLED:
         logger.info("photo search is disabled by config")
         return None, PhotoSearchState.DISABLED
+
+    if (
+        config.PHOTO_SEARCH_PROVIDER != config.EMBEDDING_PROVIDER
+        or config.PHOTO_SEARCH_MODEL != config.EMBEDDING_MODEL
+        or config.PHOTO_SEARCH_DIMENSIONS != config.EMBEDDING_DIMENSIONS
+    ):
+        logger.warning(
+            "photo search embedding config mismatch with shared index config; "
+            "PHOTO_SEARCH_PROVIDER/MODEL/DIMENSIONS must match EMBEDDING_PROVIDER/MODEL/DIMENSIONS"
+        )
+        return None, PhotoSearchState.UNREADY
 
     try:
         if config.PHOTO_SEARCH_PROVIDER == "gemini_api_key":

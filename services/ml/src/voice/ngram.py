@@ -41,22 +41,31 @@ def build_segments(tokens: list[Token]) -> list[Segment]:
                 words=list(current_words),
             ))
 
+    def reset(*, quantity: int | float = 1) -> None:
+        nonlocal current_quantity, current_unit, current_words
+        current_quantity = quantity
+        current_unit = None
+        current_words = []
+
     for token in tokens:
         if token.kind == TokenKind.QUANTITY:
             flush()
-            current_quantity = token.quantity_value if token.quantity_value is not None else 1
-            current_unit = None
-            current_words = []
+            reset(quantity=token.quantity_value if token.quantity_value is not None else 1)
         elif token.kind == TokenKind.UNIT:
+            if current_words:
+                # Units that appear after already collected words usually start a new
+                # product phrase (e.g. "... тунец упаковка яиц ...").
+                flush()
+                reset()
             current_unit = token.text
         elif token.kind == TokenKind.WORD:
             current_words.append(token.text)
         elif token.kind == TokenKind.STOPWORD:
-            if token.text in _CONJUNCTION_STOPWORDS and current_quantity != 1:
+            if token.text in _CONJUNCTION_STOPWORDS and (
+                current_words or current_unit is not None or current_quantity != 1
+            ):
                 flush()
-                current_quantity = 1
-                current_unit = None
-                current_words = []
+                reset()
             continue
     flush()
 

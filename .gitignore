@@ -81,3 +81,9 @@ docs/collected-architecture-notes/
 *GitHub.txt
 **/architecture-notes*.md
 **/architecture_notes*.md
+term-paper.yaml
+
+# Experimental optimizer DP comparison artifacts
+services/optimization/internal/modules/optimizer/algorithm/dp_optimizer.go
+services/optimization/internal/modules/optimizer/algorithm/dp_optimizer_test.go
+services/optimization/cmd/compare-optimizers/

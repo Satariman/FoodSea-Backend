@@ -6,7 +6,8 @@ import numpy as np
 from src.embeddings.cache import EmbeddingCache
 from src.voice.matcher import VoiceMatcher
 from src.voice.pipeline import VoicePipeline, VoiceItem
-from src.voice_index.index import VoiceIndex
+from src.voice.index import VoiceIndex
+from src.voice.ngram import Segment
 
 
 def _index_three_products() -> VoiceIndex:
@@ -115,3 +116,61 @@ def test_parse_keeps_separate_when_units_differ():
     assert len(resp.items) == 2
     units = sorted(item.unit for item in resp.items)
     assert units == ["кг", "л"]
+
+
+def test_parse_attribute_aware_rerank_prefers_requested_fat_percentage():
+    idx = VoiceIndex()
+    idx.fit(
+        ids=["milk", "fat20", "fat15", "monster"],
+        names=[
+            "Молоко Домик в деревне пастеризованное 2.5%, 930 мл",
+            "Сметана Домик в деревне 20%, 315 г",
+            "Сметана Простоквашино 15%, 250 г",
+            "Энергетик Monster Energy, 500 мл",
+        ],
+        vectors=[
+            np.array([1.0, 0.0, 0.0], dtype=np.float32),   # milk
+            np.array([0.0, 1.0, 0.0], dtype=np.float32),   # fat20
+            np.array([0.0, 0.85, 0.5267827], dtype=np.float32),  # fat15
+            np.array([0.0, 0.0, 1.0], dtype=np.float32),   # monster
+        ],
+    )
+
+    mapping = {
+        "молоко домик в": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        "сметану 15%": np.array([0.0, 1.0, 0.0], dtype=np.float32),
+        "энергетик монстер": np.array([0.0, 0.0, 1.0], dtype=np.float32),
+    }
+    gemini = _gemini_for_words(mapping)
+    pipeline = VoicePipeline(
+        matcher=VoiceMatcher(
+            index=idx,
+            gemini=gemini,
+            cache=EmbeddingCache(max_size=100),
+            min_score=0.7,
+            rerank_mode="attribute_aware",
+            rerank_candidates_k=3,
+        ),
+    )
+
+    resp = asyncio.run(
+        pipeline.parse(
+            "молоко домик в деревне сметану 15% и энергетик монстер",
+            "ru-RU",
+        )
+    )
+
+    names = [item.product_name for item in resp.items]
+    assert "Сметана Простоквашино 15%, 250 г" in names
+    assert "Сметана Домик в деревне 20%, 315 г" not in names
+
+
+def test_refine_segments_splits_unit_phrase_before_percent_tail():
+    segments = [
+        Segment(quantity=1, unit="упаковка", words=["яиц", "пиво", "4%"]),
+    ]
+    refined = VoicePipeline._refine_segments(segments)
+    assert refined == [
+        Segment(quantity=1, unit="упаковка", words=["яиц"]),
+        Segment(quantity=1, unit=None, words=["пиво", "4%"]),
+    ]

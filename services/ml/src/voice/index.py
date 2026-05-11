@@ -18,14 +18,32 @@ class VoiceIndex:
         self.product_ids: list[str] = []
         self.product_names: list[str] = []
         self.vectors: np.ndarray | None = None
+        self.source_provider: str = ""
+        self.source_model: str = ""
+        self.source_dimensions: int = 0
         self._knn: NearestNeighbors | None = None
 
-    def fit(self, ids: list[str], names: list[str], vectors: list[np.ndarray]) -> None:
+    def fit(
+        self,
+        ids: list[str],
+        names: list[str],
+        vectors: list[np.ndarray],
+        *,
+        source_provider: str = "",
+        source_model: str = "",
+        source_dimensions: int | None = None,
+    ) -> None:
         if not (len(ids) == len(names) == len(vectors)):
             raise ValueError("ids, names, and vectors must have equal length")
         self.product_ids = list(ids)
         self.product_names = list(names)
         self.vectors = np.vstack(vectors).astype(np.float32)
+        dimensions = int(source_dimensions) if source_dimensions is not None else int(self.vectors.shape[1])
+        if dimensions <= 0:
+            raise ValueError("source_dimensions must be positive")
+        self.source_provider = source_provider
+        self.source_model = source_model
+        self.source_dimensions = dimensions
         self._knn = NearestNeighbors(metric="cosine", algorithm="brute").fit(self.vectors)
 
     def query(self, vec: np.ndarray, top_k: int = 5) -> list[Match]:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.index import AnalogIndex
+from src.analogs.index import AnalogIndex
 
 
 def build_sample_index() -> AnalogIndex:

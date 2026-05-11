@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.voice_index.index import VoiceIndex, Match
+from src.voice.index import VoiceIndex, Match
 
 
 @pytest.fixture
@@ -19,6 +19,9 @@ def sample_index() -> VoiceIndex:
         ids=["m1", "h1", "y1"],
         names=["Молоко 1л", "Хлеб 400г", "Яблоки 1кг"],
         vectors=vectors,
+        source_provider="gemini_api_key",
+        source_model="gemini-embedding-2",
+        source_dimensions=3,
     )
     return idx
 
@@ -46,5 +49,8 @@ def test_save_and_load_roundtrip(sample_index: VoiceIndex):
         path = Path(d) / "voice_index.pkl"
         sample_index.save(path)
         loaded = VoiceIndex.load(path)
+        assert loaded.source_provider == "gemini_api_key"
+        assert loaded.source_model == "gemini-embedding-2"
+        assert loaded.source_dimensions == 3
         matches = loaded.query(np.array([1.0, 0.0, 0.0]), top_k=1)
         assert matches[0].product_id == "m1"

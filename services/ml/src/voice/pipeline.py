@@ -1,9 +1,10 @@
 import asyncio
 from collections import OrderedDict
 from dataclasses import dataclass
+import re
 
 from src.voice.matcher import NGramMatch, VoiceMatcher
-from src.voice.ngram import build_segments
+from src.voice.ngram import Segment, build_segments
 from src.voice.tokenizer import tokenize
 
 
@@ -29,7 +30,7 @@ class VoicePipeline:
 
     async def parse(self, text: str, locale: str) -> ParseResponse:
         tokens = tokenize(text)
-        segments = build_segments(tokens)
+        segments = self._refine_segments(build_segments(tokens))
         if not segments:
             return ParseResponse(items=[], unmatched_queries=[])
 
@@ -57,6 +58,44 @@ class VoicePipeline:
                     raw_query=nm.ngram.text,
                 ))
         return ParseResponse(items=self._deduplicate(items), unmatched_queries=unmatched)
+
+    @staticmethod
+    def _refine_segments(segments: list[Segment]) -> list[Segment]:
+        refined: list[Segment] = []
+        for segment in segments:
+            refined.extend(VoicePipeline._split_unit_segment_before_percent_tail(segment))
+        return refined
+
+    @staticmethod
+    def _split_unit_segment_before_percent_tail(segment: Segment) -> list[Segment]:
+        if segment.unit is None or len(segment.words) < 3:
+            return [segment]
+
+        percent_idx = next(
+            (idx for idx, word in enumerate(segment.words) if _looks_like_percent_token(word)),
+            None,
+        )
+        if percent_idx is None or percent_idx < 2:
+            return [segment]
+
+        split_idx = percent_idx - 1
+        left_words = segment.words[:split_idx]
+        right_words = segment.words[split_idx:]
+        if not left_words or not right_words:
+            return [segment]
+
+        return [
+            Segment(
+                quantity=segment.quantity,
+                unit=segment.unit,
+                words=left_words,
+            ),
+            Segment(
+                quantity=1,
+                unit=None,
+                words=right_words,
+            ),
+        ]
 
     @staticmethod
     def _greedy_assign(matches: list[NGramMatch]) -> list[NGramMatch]:
@@ -93,3 +132,10 @@ class VoicePipeline:
                 raw_query=f"{existing.raw_query}, {item.raw_query}",
             )
         return list(merged.values())
+
+
+_PERCENT_TOKEN_RE = re.compile(r"^\d+(?:[.,]\d+)?%$")
+
+
+def _looks_like_percent_token(word: str) -> bool:
+    return bool(_PERCENT_TOKEN_RE.match(word))

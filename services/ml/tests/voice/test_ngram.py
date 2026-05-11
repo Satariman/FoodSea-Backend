@@ -39,8 +39,27 @@ def test_build_segments_attaches_unit_to_segment():
 def test_build_segments_ignores_stopwords_in_words():
     tokens = tokenize("молоко и хлеб")
     segs = build_segments(tokens)
-    assert len(segs) == 1
-    assert segs[0].words == ["молоко", "хлеб"]
+    assert len(segs) == 2
+    assert segs[0].words == ["молоко"]
+    assert segs[1].words == ["хлеб"]
+
+
+def test_build_segments_conjunction_splits_plain_phrases():
+    tokens = tokenize("вишневый морс и тунец")
+    segs = build_segments(tokens)
+    assert len(segs) == 2
+    assert segs[0].quantity == 1 and segs[0].unit is None and segs[0].words == ["вишневый", "морс"]
+    assert segs[1].quantity == 1 and segs[1].unit is None and segs[1].words == ["тунец"]
+
+
+def test_build_segments_unit_inside_phrase_starts_new_segment():
+    tokens = tokenize("консервы тунец упаковка яиц")
+    segs = build_segments(tokens)
+    assert len(segs) == 2
+    assert segs[0].words == ["консервы", "тунец"]
+    assert segs[0].unit is None
+    assert segs[1].words == ["яиц"]
+    assert segs[1].unit == "упаковка"
 
 
 def test_build_segments_skips_empty_segments():

@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from src.data_loader import ProductData
-from src.feature_builder import FeatureBuilder
+from src.analogs.feature_builder import FeatureBuilder
 
 
 class DummyEncoder:

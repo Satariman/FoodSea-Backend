@@ -1,5 +1,5 @@
 from src.proto import voice_pb2
-from src.service import VoiceServicer
+from src.voice.servicer import VoiceServicer
 from src.voice.pipeline import ParseResponse, VoiceItem
 
 
