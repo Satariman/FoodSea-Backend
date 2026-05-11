@@ -117,3 +117,54 @@ func TestSearchByPhoto_InvalidTopK(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
 }
+
+func TestSearchByPhoto_MissingImageReturnsBadRequest(t *testing.T) {
+	h := handler.NewHandler(&mockSearchByPhoto{}, 8*1024*1024)
+	r := buildRouter(h)
+
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	require.NoError(t, w.WriteField("ocr_text", "молоко"))
+	require.NoError(t, w.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/products/photo-search", &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestSearchByPhoto_MissingOrBlankOCRTextReturnsBadRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		ocr  string
+	}{
+		{name: "missing", ocr: ""},
+		{name: "blank", ocr: "   "},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := handler.NewHandler(&mockSearchByPhoto{}, 8*1024*1024)
+			r := buildRouter(h)
+
+			req := newMultipartRequest(t, "image/jpeg", tc.ocr, "")
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+		})
+	}
+}
+
+func TestSearchByPhoto_OversizedImageReturnsRequestEntityTooLarge(t *testing.T) {
+	h := handler.NewHandler(&mockSearchByPhoto{}, 8)
+	r := buildRouter(h)
+
+	req := newMultipartRequest(t, "image/jpeg", "молоко", "")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+}

@@ -76,8 +76,19 @@ func (h *Handler) SearchByPhoto(c *gin.Context) {
 		topK = value
 	}
 
+	ocrText := strings.TrimSpace(c.PostForm("ocr_text"))
+	if ocrText == "" {
+		httputil.BadRequest(c, "ocr_text is required")
+		return
+	}
+
 	imageBytes, err := io.ReadAll(file)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			c.JSON(http.StatusRequestEntityTooLarge, httputil.Response{Error: "image is too large"})
+			return
+		}
 		httputil.BadRequest(c, "failed to read image")
 		return
 	}
@@ -85,7 +96,7 @@ func (h *Handler) SearchByPhoto(c *gin.Context) {
 	result, err := h.searchByPhoto.Execute(c.Request.Context(), domain.SearchByPhotoRequest{
 		Image:         imageBytes,
 		ImageMimeType: mimeType,
-		OCRText:       c.PostForm("ocr_text"),
+		OCRText:       ocrText,
 		TopK:          topK,
 	})
 	if err != nil {

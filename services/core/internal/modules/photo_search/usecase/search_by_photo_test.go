@@ -97,7 +97,11 @@ func TestSearchByPhoto_MLClientReceivesDeadlineContext(t *testing.T) {
 
 	client.On("SearchByPhoto", mock.MatchedBy(func(ctx context.Context) bool {
 		deadline, ok := ctx.Deadline()
-		return ok && time.Until(deadline) > 0
+		if !ok {
+			return false
+		}
+		until := time.Until(deadline)
+		return until >= 4500*time.Millisecond && until <= 5500*time.Millisecond
 	}), mock.Anything).Return(domain.SearchByPhotoResult{
 		Candidates: []domain.Candidate{
 			{ProductID: productID, Score: 0.77},
@@ -115,4 +119,70 @@ func TestSearchByPhoto_MLClientReceivesDeadlineContext(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, result.Candidates, 1)
+}
+
+func TestSearchByPhoto_MLUnavailableErrorPropagates(t *testing.T) {
+	client := &mockPhotoClient{}
+	loader := &mockProductLoader{}
+	uc := usecase.NewSearchByPhoto(client, loader)
+
+	client.On("SearchByPhoto", mock.Anything, mock.Anything).Return(domain.SearchByPhotoResult{}, sherrors.ErrUnavailable)
+
+	_, err := uc.Execute(context.Background(), domain.SearchByPhotoRequest{
+		Image:         []byte("img"),
+		ImageMimeType: "image/jpeg",
+		OCRText:       "молоко 3.2",
+	})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, sherrors.ErrUnavailable))
+}
+
+func TestSearchByPhoto_SkipsInvalidProductIDCandidate(t *testing.T) {
+	client := &mockPhotoClient{}
+	loader := &mockProductLoader{}
+	uc := usecase.NewSearchByPhoto(client, loader)
+
+	validID := uuid.New()
+
+	client.On("SearchByPhoto", mock.Anything, mock.Anything).Return(domain.SearchByPhotoResult{
+		Candidates: []domain.Candidate{
+			{ProductID: uuid.Nil, Score: 0.99},
+			{ProductID: validID, Score: 0.77},
+		},
+	}, nil)
+	loader.On("Execute", mock.Anything, validID).Return(&catalogdomain.ProductDetail{
+		Product: catalogdomain.Product{ID: validID, Name: "Milk"},
+	}, nil)
+
+	result, err := uc.Execute(context.Background(), domain.SearchByPhotoRequest{
+		Image:         []byte("img"),
+		ImageMimeType: "image/jpeg",
+		OCRText:       "молоко 3.2",
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Candidates, 1)
+	assert.Equal(t, validID, result.Candidates[0].Product.ID)
+	loader.AssertNotCalled(t, "Execute", mock.Anything, uuid.Nil)
+}
+
+func TestSearchByPhoto_EmptyCandidatesReturnsEmptyResult(t *testing.T) {
+	client := &mockPhotoClient{}
+	loader := &mockProductLoader{}
+	uc := usecase.NewSearchByPhoto(client, loader)
+
+	client.On("SearchByPhoto", mock.Anything, mock.Anything).Return(domain.SearchByPhotoResult{
+		MatchedName:  "молоко",
+		MatchedBrand: "бренд",
+		Candidates:   []domain.Candidate{},
+	}, nil)
+
+	result, err := uc.Execute(context.Background(), domain.SearchByPhotoRequest{
+		Image:         []byte("img"),
+		ImageMimeType: "image/jpeg",
+		OCRText:       "молоко 3.2",
+	})
+	require.NoError(t, err)
+	require.Empty(t, result.Candidates)
+	assert.Equal(t, "молоко", result.MatchedName)
+	assert.Equal(t, "бренд", result.MatchedBrand)
 }

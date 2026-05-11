@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/foodsea/core/internal/modules/photo_search/domain"
 	sherrors "github.com/foodsea/core/internal/shared/errors"
 )
@@ -49,6 +51,10 @@ func (uc *SearchByPhoto) Execute(ctx context.Context, req domain.SearchByPhotoRe
 	}
 
 	for _, candidate := range mlResult.Candidates {
+		if candidate.ProductID == uuid.Nil {
+			continue
+		}
+
 		product, loadErr := uc.loader.Execute(ctx, candidate.ProductID)
 		if loadErr != nil {
 			if errors.Is(loadErr, sherrors.ErrNotFound) {
