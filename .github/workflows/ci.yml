@@ -4,11 +4,10 @@ on:
   pull_request:
   push:
     branches:
-      - main
       - develop
 
 jobs:
-  test-and-render:
+  test-render-build-scan:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,14 +23,27 @@ jobs:
             services/ordering/go.sum
             proto/go.sum
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bootstrap ML test environment
+        run: |
+          python -m venv services/ml/.venv
+          make -C services/ml install
+
       - name: Go unit tests
         run: make test-unit
 
+      - name: Go integration tests
+        run: make test-integration
+
+      - name: ML tests
+        run: make test-ml
+
       - name: Render dev manifests
         run: kubectl kustomize deploy/k8s/overlays/dev >/tmp/foodsea-dev.yaml
-
-      - name: Render prod manifests
-        run: kubectl kustomize deploy/k8s/overlays/prod >/tmp/foodsea-prod.yaml
 
       - name: Build service images
         run: |
@@ -39,3 +51,35 @@ jobs:
           docker build -f services/optimization/Dockerfile -t foodsea/optimization-service:ci .
           docker build -f services/ordering/Dockerfile -t foodsea/ordering-service:ci .
           docker build -f services/ml/Dockerfile -t foodsea/ml-service:ci services/ml
+
+      - name: Trivy scan core image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: foodsea/core-service:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Trivy scan optimization image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: foodsea/optimization-service:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Trivy scan ordering image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: foodsea/ordering-service:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Trivy scan ml image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: foodsea/ml-service:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

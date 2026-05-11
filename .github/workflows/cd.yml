@@ -3,29 +3,59 @@ name: CD
 on:
   push:
     branches:
-      - main
       - develop
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
 
 permissions:
   contents: read
   packages: write
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+          cache-dependency-path: |
+            services/core/go.sum
+            services/optimization/go.sum
+            services/ordering/go.sum
+            proto/go.sum
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bootstrap ML test environment
+        run: |
+          python -m venv services/ml/.venv
+          make -C services/ml install
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Run integration tests
+        run: make test-integration
+
+      - name: Run ML tests
+        run: make test-ml
+
   build:
     runs-on: ubuntu-latest
+    needs: verify
     outputs:
       image_registry: ${{ steps.meta.outputs.image_registry }}
       image_tag: ${{ steps.meta.outputs.image_tag }}
-      target_env: ${{ steps.meta.outputs.target_env }}
+      core_digest: ${{ steps.push_core.outputs.digest }}
+      optimization_digest: ${{ steps.push_optimization.outputs.digest }}
+      ordering_digest: ${{ steps.push_ordering.outputs.digest }}
+      ml_digest: ${{ steps.push_ml.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,16 +65,8 @@ jobs:
         shell: bash
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            target_env="${{ inputs.environment }}"
-          elif [[ "${GITHUB_REF_NAME}" == "main" ]]; then
-            target_env="prod"
-          else
-            target_env="dev"
-          fi
           echo "image_registry=ghcr.io/${owner}/foodsea-backend" >> "$GITHUB_OUTPUT"
           echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "target_env=${target_env}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -57,6 +79,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push core
+        id: push_core
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -64,9 +87,10 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.image_registry }}/core-service:${{ steps.meta.outputs.image_tag }}
-            ${{ steps.meta.outputs.image_registry }}/core-service:${{ steps.meta.outputs.target_env }}
+            ${{ steps.meta.outputs.image_registry }}/core-service:dev
 
       - name: Build and push optimization
+        id: push_optimization
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -74,9 +98,10 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.image_registry }}/optimization-service:${{ steps.meta.outputs.image_tag }}
-            ${{ steps.meta.outputs.image_registry }}/optimization-service:${{ steps.meta.outputs.target_env }}
+            ${{ steps.meta.outputs.image_registry }}/optimization-service:dev
 
       - name: Build and push ordering
+        id: push_ordering
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -84,9 +109,10 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.image_registry }}/ordering-service:${{ steps.meta.outputs.image_tag }}
-            ${{ steps.meta.outputs.image_registry }}/ordering-service:${{ steps.meta.outputs.target_env }}
+            ${{ steps.meta.outputs.image_registry }}/ordering-service:dev
 
       - name: Build and push ml
+        id: push_ml
         uses: docker/build-push-action@v6
         with:
           context: services/ml
@@ -94,24 +120,14 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.image_registry }}/ml-service:${{ steps.meta.outputs.image_tag }}
-            ${{ steps.meta.outputs.image_registry }}/ml-service:${{ steps.meta.outputs.target_env }}
+            ${{ steps.meta.outputs.image_registry }}/ml-service:dev
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    environment: ${{ needs.build.outputs.target_env }}
+    environment: dev
     steps:
-      - name: Resolve host
-        id: host
-        shell: bash
-        run: |
-          if [[ "${{ needs.build.outputs.target_env }}" == "prod" ]]; then
-            echo "foodsea_host=${{ secrets.PROD_HOST }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "foodsea_host=${{ secrets.DEV_HOST }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Deploy over SSH
+      - name: Deploy over SSH (dev only)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VM_HOST }}
@@ -121,27 +137,57 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            REPO_DIR="/opt/foodsea/backend-${{ needs.build.outputs.target_env }}"
+
+            REPO_DIR="/opt/foodsea/backend-dev"
+            if [[ "${REPO_DIR}" != "/opt/foodsea/backend-dev" ]]; then
+              echo "unexpected deploy path: ${REPO_DIR}" >&2
+              exit 1
+            fi
+
             REPO_URL="https://github.com/${{ github.repository }}.git"
             REPO_READ_TOKEN="${{ secrets.REPO_READ_TOKEN }}"
             if [ -n "${REPO_READ_TOKEN}" ]; then
               REPO_URL="https://x-access-token:${REPO_READ_TOKEN}@github.com/${{ github.repository }}.git"
             fi
+
             sudo install -d -o "$USER" -g "$USER" "${REPO_DIR}"
             if [ ! -d "${REPO_DIR}/.git" ]; then
               git clone "${REPO_URL}" "${REPO_DIR}"
             fi
+
             rm -f "${REPO_DIR}/.git/index.lock"
             cd "${REPO_DIR}"
             git remote set-url origin "${REPO_URL}"
             git fetch origin "${{ github.sha }}"
             git checkout --force "${{ github.sha }}"
+
             export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-            export FOODSEA_ENV="${{ needs.build.outputs.target_env }}"
-            export FOODSEA_HOST="${{ steps.host.outputs.foodsea_host }}"
+            export FOODSEA_ENV="dev"
+            export FOODSEA_HOST="${{ secrets.DEV_HOST }}"
             export IMAGE_REGISTRY="${{ needs.build.outputs.image_registry }}"
             export IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+            export RELEASE_SHA="${{ github.sha }}"
+            export RELEASE_NAMESPACE="foodsea-dev"
+            export IMAGE_DIGEST_CORE="${{ needs.build.outputs.core_digest }}"
+            export IMAGE_DIGEST_OPTIMIZATION="${{ needs.build.outputs.optimization_digest }}"
+            export IMAGE_DIGEST_ORDERING="${{ needs.build.outputs.ordering_digest }}"
+            export IMAGE_DIGEST_ML="${{ needs.build.outputs.ml_digest }}"
             export REGISTRY_SERVER="ghcr.io"
             export REGISTRY_USERNAME="${{ github.actor }}"
             export REGISTRY_PASSWORD="${{ secrets.GHCR_READ_TOKEN }}"
+
             deploy/scripts/deploy-k8s.sh
+
+      - name: Release traceability summary
+        run: |
+          {
+            echo "## Deploy Report (dev)"
+            echo "- commit_sha: \`${{ github.sha }}\`"
+            echo "- namespace: \`foodsea-dev\`"
+            echo "- image_tag: \`${{ needs.build.outputs.image_tag }}\`"
+            echo "- core_digest: \`${{ needs.build.outputs.core_digest }}\`"
+            echo "- optimization_digest: \`${{ needs.build.outputs.optimization_digest }}\`"
+            echo "- ordering_digest: \`${{ needs.build.outputs.ordering_digest }}\`"
+            echo "- ml_digest: \`${{ needs.build.outputs.ml_digest }}\`"
+            echo "- smoke_check: \`passed\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -6,6 +6,12 @@ FOODSEA_ENV="${FOODSEA_ENV:-dev}"
 FOODSEA_HOST="${FOODSEA_HOST:-}"
 IMAGE_REGISTRY="${IMAGE_REGISTRY:-foodsea}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+RELEASE_SHA="${RELEASE_SHA:-unknown}"
+RELEASE_NAMESPACE="${RELEASE_NAMESPACE:-}"
+IMAGE_DIGEST_CORE="${IMAGE_DIGEST_CORE:-unknown}"
+IMAGE_DIGEST_OPTIMIZATION="${IMAGE_DIGEST_OPTIMIZATION:-unknown}"
+IMAGE_DIGEST_ORDERING="${IMAGE_DIGEST_ORDERING:-unknown}"
+IMAGE_DIGEST_ML="${IMAGE_DIGEST_ML:-unknown}"
 SMOKE_SCHEME="${SMOKE_SCHEME:-http}"
 SMOKE_ADDR="${SMOKE_ADDR:-127.0.0.1}"
 
@@ -26,6 +32,35 @@ NS="foodsea-${FOODSEA_ENV}"
 OVERLAY="${ROOT_DIR}/deploy/k8s/overlays/${FOODSEA_ENV}"
 TMP_MANIFEST="$(mktemp)"
 trap 'rm -f "${TMP_MANIFEST}"' EXIT
+if [[ -z "${RELEASE_NAMESPACE}" ]]; then
+  RELEASE_NAMESPACE="${NS}"
+fi
+
+collect_diagnostics() {
+  echo "collecting deployment diagnostics for namespace ${NS}..."
+  kubectl -n "${NS}" get pods -o wide || true
+  kubectl -n "${NS}" describe pod || true
+  for dep in core-service optimization-service ordering-service ml-service; do
+    kubectl -n "${NS}" logs "deployment/${dep}" --all-containers --tail=200 || true
+    kubectl -n "${NS}" logs "deployment/${dep}" --all-containers --previous --tail=200 || true
+  done
+}
+
+rollback_critical() {
+  echo "rolling back critical deployments..."
+  for dep in core-service optimization-service ordering-service ml-service; do
+    kubectl -n "${NS}" rollout undo "deployment/${dep}" || true
+  done
+}
+
+rollout_or_fail() {
+  local resource="$1"
+  if ! kubectl -n "${NS}" rollout status "${resource}" --timeout=600s; then
+    collect_diagnostics
+    rollback_critical
+    exit 1
+  fi
+}
 
 secret_value() {
   local name="$1"
@@ -116,6 +151,18 @@ sed -i.bak \
   -e "s#image: ml-service:latest#image: ${IMAGE_REGISTRY}/ml-service:${IMAGE_TAG}#g" \
   "${TMP_MANIFEST}"
 
+set +e
+kubectl diff -f "${TMP_MANIFEST}" >/tmp/foodsea-kubectl-diff.txt
+diff_exit=$?
+set -e
+# exit code 1 means diff found, >1 means real error
+if [[ ${diff_exit} -gt 1 ]]; then
+  echo "kubectl diff failed"
+  cat /tmp/foodsea-kubectl-diff.txt || true
+  exit ${diff_exit}
+fi
+cat /tmp/foodsea-kubectl-diff.txt || true
+
 kubectl apply -f "${TMP_MANIFEST}"
 
 kubectl -n "${NS}" wait --for=condition=complete job/migrate-core --timeout=600s
@@ -126,11 +173,29 @@ kubectl -n "${NS}" wait --for=condition=complete job/kafka-init-topics --timeout
 kubectl -n "${NS}" rollout status statefulset/core-postgres --timeout=600s
 kubectl -n "${NS}" rollout status statefulset/optimization-postgres --timeout=600s
 kubectl -n "${NS}" rollout status statefulset/ordering-postgres --timeout=600s
-kubectl -n "${NS}" rollout status deployment/core-service --timeout=600s
-kubectl -n "${NS}" rollout status deployment/optimization-service --timeout=600s
-kubectl -n "${NS}" rollout status deployment/ordering-service --timeout=600s
-kubectl -n "${NS}" rollout status deployment/ml-service --timeout=600s
+rollout_or_fail deployment/core-service
+rollout_or_fail deployment/optimization-service
+rollout_or_fail deployment/ordering-service
+rollout_or_fail deployment/ml-service
 
 curl -fsS -H "Host: ${FOODSEA_HOST}" "${SMOKE_SCHEME}://${SMOKE_ADDR}/api/v1/categories" >/dev/null
 
+report_path="${ROOT_DIR}/reports/deploy-${FOODSEA_ENV}-$(date +%Y%m%d-%H%M%S).json"
+mkdir -p "$(dirname "${report_path}")"
+cat >"${report_path}" <<EOF
+{
+  "commit_sha": "${RELEASE_SHA}",
+  "namespace": "${RELEASE_NAMESPACE}",
+  "image_tag": "${IMAGE_TAG}",
+  "images": {
+    "core": {"tag": "${IMAGE_REGISTRY}/core-service:${IMAGE_TAG}", "digest": "${IMAGE_DIGEST_CORE}"},
+    "optimization": {"tag": "${IMAGE_REGISTRY}/optimization-service:${IMAGE_TAG}", "digest": "${IMAGE_DIGEST_OPTIMIZATION}"},
+    "ordering": {"tag": "${IMAGE_REGISTRY}/ordering-service:${IMAGE_TAG}", "digest": "${IMAGE_DIGEST_ORDERING}"},
+    "ml": {"tag": "${IMAGE_REGISTRY}/ml-service:${IMAGE_TAG}", "digest": "${IMAGE_DIGEST_ML}"}
+  },
+  "smoke_check": "passed"
+}
+EOF
+
+echo "deploy report saved to ${report_path}"
 echo "Deployment ${FOODSEA_ENV} is ready at ${SMOKE_SCHEME}://${FOODSEA_HOST}"
