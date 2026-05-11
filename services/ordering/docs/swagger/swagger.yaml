@@ -1,0 +1,308 @@
+basePath: /api/v1
+definitions:
+  github_com_foodsea_ordering_internal_platform_httputil.Meta:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total_count:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  github_com_foodsea_ordering_internal_platform_httputil.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+      meta:
+        $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Meta'
+    type: object
+  internal_modules_orders_handler.OrderBriefResponse:
+    properties:
+      created_at:
+        type: string
+      delivery_kopecks:
+        type: integer
+      id:
+        type: string
+      status:
+        type: string
+      total_kopecks:
+        type: integer
+    type: object
+  internal_modules_orders_handler.OrderDetailResponse:
+    properties:
+      created_at:
+        type: string
+      delivery_kopecks:
+        type: integer
+      history:
+        items:
+          $ref: '#/definitions/internal_modules_orders_handler.StatusChangeResponse'
+        type: array
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_orders_handler.OrderItemResponse'
+        type: array
+      optimization_result_id:
+        type: string
+      status:
+        type: string
+      total_kopecks:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  internal_modules_orders_handler.OrderItemResponse:
+    properties:
+      id:
+        type: string
+      price_kopecks:
+        type: integer
+      product_id:
+        type: string
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      store_id:
+        type: string
+      store_name:
+        type: string
+    type: object
+  internal_modules_orders_handler.StatusChangeResponse:
+    properties:
+      changed_at:
+        type: string
+      comment:
+        type: string
+      status:
+        type: string
+    type: object
+  internal_modules_orders_handler.UpdateStatusRequest:
+    properties:
+      comment:
+        type: string
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  internal_modules_saga_handler.placeOrderRequest:
+    properties:
+      optimization_result_id:
+        type: string
+    required:
+    - optimization_result_id
+    type: object
+  internal_modules_saga_handler.placeOrderResponse:
+    properties:
+      order_id:
+        type: string
+      status:
+        type: string
+    type: object
+  internal_modules_saga_handler.sagaStateResponse:
+    properties:
+      current_step:
+        type: integer
+      failure_reason:
+        type: string
+      order_id:
+        type: string
+      saga_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+host: localhost:8083
+info:
+  contact: {}
+  description: Ordering service API — заказы, saga оформления.
+  title: FoodSea Ordering API
+  version: "1.0"
+paths:
+  /orders:
+    get:
+      parameters:
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/internal_modules_orders_handler.OrderBriefResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: List user orders
+      tags:
+      - orders
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Optimization result ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_saga_handler.placeOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_saga_handler.placeOrderResponse'
+              type: object
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Place a new order via saga
+      tags:
+      - orders
+  /orders/{id}:
+    get:
+      parameters:
+      - description: Order UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_orders_handler.OrderDetailResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Get order by ID
+      tags:
+      - orders
+  /orders/{id}/saga:
+    get:
+      parameters:
+      - description: Order UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_saga_handler.sagaStateResponse'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Get saga state for an order (admin/debug)
+      tags:
+      - orders
+  /orders/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status transition
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_orders_handler.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_foodsea_ordering_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Update order status (admin / demo)
+      tags:
+      - orders
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT токен. Формат: "Bearer {token}"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -1,0 +1,241 @@
+basePath: /api/v1
+definitions:
+  github_com_foodsea_optimization_internal_platform_httputil.Meta:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total_count:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  github_com_foodsea_optimization_internal_platform_httputil.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+      meta:
+        $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Meta'
+    type: object
+  internal_modules_optimizer_handler.AnalogDTO:
+    properties:
+      min_price_kopecks:
+        type: integer
+      product_id:
+        type: string
+      product_name:
+        type: string
+      score:
+        type: number
+    type: object
+  internal_modules_optimizer_handler.AnalogsResponse:
+    properties:
+      analogs:
+        items:
+          $ref: '#/definitions/internal_modules_optimizer_handler.AnalogDTO'
+        type: array
+    type: object
+  internal_modules_optimizer_handler.AssignmentDTO:
+    properties:
+      price_kopecks:
+        type: integer
+      product_id:
+        type: string
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      store_id:
+        type: string
+      store_name:
+        type: string
+    type: object
+  internal_modules_optimizer_handler.OptimizationResultResponse:
+    properties:
+      delivery_kopecks:
+        type: integer
+      id:
+        type: string
+      is_approximate:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_optimizer_handler.AssignmentDTO'
+        type: array
+      savings_kopecks:
+        type: integer
+      status:
+        type: string
+      substitutions:
+        items:
+          $ref: '#/definitions/internal_modules_optimizer_handler.SubstitutionDTO'
+        type: array
+      total_kopecks:
+        type: integer
+    type: object
+  internal_modules_optimizer_handler.SubstitutionDTO:
+    properties:
+      analog_product_id:
+        type: string
+      analog_product_name:
+        type: string
+      delivery_delta_kopecks:
+        type: integer
+      is_cross_store:
+        type: boolean
+      new_price_kopecks:
+        type: integer
+      new_store_id:
+        type: string
+      new_store_name:
+        type: string
+      old_price_kopecks:
+        type: integer
+      original_product_id:
+        type: string
+      original_product_name:
+        type: string
+      original_store_id:
+        type: string
+      price_delta_kopecks:
+        type: integer
+      score:
+        type: number
+      total_saving_kopecks:
+        type: integer
+    type: object
+host: localhost:8082
+info:
+  contact: {}
+  description: Сервис оптимизации корзины и подбора аналогов.
+  title: FoodSea Optimization Service API
+  version: "1.0"
+paths:
+  /analogs/{product_id}:
+    get:
+      parameters:
+      - description: Product UUID
+        in: path
+        name: product_id
+        required: true
+        type: string
+      - description: Top K analogs (default=5, max=20)
+        in: query
+        name: top_k
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_optimizer_handler.AnalogsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Get analogs for product card
+      tags:
+      - optimization
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - service
+  /optimize:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_optimizer_handler.OptimizationResultResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Run cart optimization
+      tags:
+      - optimization
+  /optimize/{id}:
+    get:
+      parameters:
+      - description: Result UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_modules_optimizer_handler.OptimizationResultResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_foodsea_optimization_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Get optimization result by ID
+      tags:
+      - optimization
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT токен. Формат: "Bearer {token}"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

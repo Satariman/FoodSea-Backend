@@ -1,6 +1,6 @@
 .PHONY: all build generate proto swagger swagger-optimization test test-unit test-integration test-cover test-optimization test-e2e-core test-e2e-ordering test-e2e-optimization test-go-all test-swagger-regression test-ml test-all lint \
         docker-build dev-infra-up dev-infra-down dev-core dev-ordering dev-all stop-all \
-        k8s-deploy k8s-down k8s-logs k8s-status \
+        k8s-render k8s-deploy k8s-down k8s-logs k8s-status \
         migrate-core migrate-optimization migrate-ordering migrate \
         atlas-diff-core atlas-diff-ordering atlas-hash \
         seed-core \
@@ -147,11 +147,14 @@ lint:
 
 # ── Docker ───────────────────────────────────────────────────────────────────
 
+IMAGE_REGISTRY ?= foodsea
+IMAGE_TAG      ?= latest
+
 docker-build:
-	docker build -t foodsea/core-service:latest services/core
-	docker build -t foodsea/optimization-service:latest services/optimization
-	docker build -t foodsea/ordering-service:latest services/ordering
-	docker build -t foodsea/ml-service:latest services/ml
+	docker build -f services/core/Dockerfile -t $(IMAGE_REGISTRY)/core-service:$(IMAGE_TAG) .
+	docker build -f services/optimization/Dockerfile -t $(IMAGE_REGISTRY)/optimization-service:$(IMAGE_TAG) .
+	docker build -f services/ordering/Dockerfile -t $(IMAGE_REGISTRY)/ordering-service:$(IMAGE_TAG) .
+	docker build -f services/ml/Dockerfile -t $(IMAGE_REGISTRY)/ml-service:$(IMAGE_TAG) services/ml
 
 CORE_DB_URL      ?= postgres://postgres:postgres@localhost:5433/core_db?sslmode=disable
 OPTIMIZATION_DB_URL ?= postgres://postgres:postgres@localhost:5434/optimization_db?sslmode=disable
@@ -254,18 +257,22 @@ stop-all:
 
 # ── Kubernetes ───────────────────────────────────────────────────────────────
 
-k8s-deploy: docker-build
-	kubectl apply -f deploy/k8s/namespace.yaml
-	kubectl apply -f deploy/k8s/ -R
+K8S_ENV ?= dev
+
+k8s-render:
+	kubectl kustomize deploy/k8s/overlays/$(K8S_ENV)
+
+k8s-deploy:
+	kubectl apply -k deploy/k8s/overlays/$(K8S_ENV)
 
 k8s-down:
-	kubectl delete namespace foodsea --ignore-not-found
+	kubectl delete -k deploy/k8s/overlays/$(K8S_ENV) --ignore-not-found
 
 k8s-logs:
-	kubectl logs -f deployment/$(SVC) -n foodsea
+	kubectl logs -f deployment/$(SVC) -n foodsea-$(K8S_ENV)
 
 k8s-status:
-	kubectl get pods,svc,ingress -n foodsea
+	kubectl get pods,svc,ingress -n foodsea-$(K8S_ENV)
 
 # ── Migrations ───────────────────────────────────────────────────────────────
 
