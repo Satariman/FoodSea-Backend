@@ -77,6 +77,14 @@ func (m *mockOAuthCallback) Execute(ctx context.Context, req domain.OAuthCallbac
 	return args.Get(0).(domain.OAuthCallbackResult), args.Error(1)
 }
 
+func (m *mockOAuthCallback) ExecuteToken(ctx context.Context, req domain.OAuthTokenCallbackRequest) (domain.OAuthTokenCallbackResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return domain.OAuthTokenCallbackResult{}, args.Error(1)
+	}
+	return args.Get(0).(domain.OAuthTokenCallbackResult), args.Error(1)
+}
+
 // helpers
 
 func testPair() domain.TokenPair {
@@ -100,6 +108,9 @@ func setupAuthRouter(h *AuthHandler) *gin.Engine {
 	r.POST("/auth/refresh", h.Refresh)
 	r.GET("/auth/oauth/:provider/start", h.OAuthStart)
 	r.POST("/auth/oauth/:provider/callback", h.OAuthCallback)
+	r.GET("/auth/oauth/native/:provider/start", h.OAuthNativeStart)
+	r.POST("/auth/oauth/native/:provider/callback", h.OAuthNativeCallback)
+	r.POST("/auth/oauth/native/:provider/sdk/callback", h.OAuthNativeSDKCallback)
 	r.POST("/auth/logout", middleware.Auth("test-secret"), h.Logout)
 	return r
 }
@@ -249,6 +260,7 @@ func TestAuthHandler_OAuthStart(t *testing.T) {
 		oauthStart.On("Execute", mock.Anything, domain.OAuthStartRequest{
 			Provider:   domain.OAuthProviderGoogle,
 			RedirectTo: "https://app/cb",
+			Mode:       domain.OAuthFlowModeLegacy,
 		}).Return(domain.OAuthStartResult{
 			AuthURL: "https://accounts.google.com/auth?state=s1",
 			State:   "s1",
@@ -280,15 +292,37 @@ func TestAuthHandler_OAuthStart(t *testing.T) {
 	})
 }
 
+func TestAuthHandler_OAuthNativeStart(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		oauthStart := &mockOAuthStart{}
+		oauthStart.On("Execute", mock.Anything, domain.OAuthStartRequest{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "foodsea://oauth/callback",
+			Mode:       domain.OAuthFlowModeNative,
+		}).Return(domain.OAuthStartResult{
+			AuthURL: "https://accounts.google.com/auth?state=s1",
+			State:   "s1",
+		}, nil)
+
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, oauthStart, &mockOAuthCallback{})
+		req := httptest.NewRequest(http.MethodGet, "/auth/oauth/native/google/start?redirect_uri=foodsea://oauth/callback", nil)
+		w := httptest.NewRecorder()
+		setupAuthRouter(h).ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
 func TestAuthHandler_OAuthCallback(t *testing.T) {
 	t.Run("callback success => 200", func(t *testing.T) {
 		oauthCallback := &mockOAuthCallback{}
 		u := testUser()
 		pair := testPair()
 		oauthCallback.On("Execute", mock.Anything, domain.OAuthCallbackRequest{
-			Provider: domain.OAuthProviderGoogle,
-			Code:     "code-1",
-			State:    "state-1",
+			Provider:    domain.OAuthProviderGoogle,
+			Code:        "code-1",
+			State:       "state-1",
+			RedirectURI: "https://app/cb",
+			Mode:        domain.OAuthFlowModeLegacy,
 		}).Return(domain.OAuthCallbackResult{
 			User:      u,
 			TokenPair: pair,
@@ -343,5 +377,58 @@ func TestAuthHandler_OAuthCallback(t *testing.T) {
 			"redirect_uri": "https://app/cb",
 		})
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+func TestAuthHandler_OAuthNativeCallback(t *testing.T) {
+	t.Run("callback success => 200", func(t *testing.T) {
+		oauthCallback := &mockOAuthCallback{}
+		u := testUser()
+		pair := testPair()
+		oauthCallback.On("Execute", mock.Anything, domain.OAuthCallbackRequest{
+			Provider:    domain.OAuthProviderGoogle,
+			Code:        "code-1",
+			State:       "state-1",
+			RedirectURI: "foodsea://oauth/callback",
+			Mode:        domain.OAuthFlowModeNative,
+		}).Return(domain.OAuthCallbackResult{
+			User:      u,
+			TokenPair: pair,
+		}, nil)
+
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, oauthCallback)
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/native/google/callback", map[string]any{
+			"code":         "code-1",
+			"state":        "state-1",
+			"redirect_uri": "foodsea://oauth/callback",
+		})
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+func TestAuthHandler_OAuthNativeSDKCallback(t *testing.T) {
+	t.Run("sdk callback success => 200", func(t *testing.T) {
+		oauthCallback := &mockOAuthCallback{}
+		u := testUser()
+		pair := testPair()
+		oauthCallback.On("ExecuteToken", mock.Anything, domain.OAuthTokenCallbackRequest{
+			Provider:    domain.OAuthProviderYandex,
+			AccessToken: "sdk-token",
+		}).Return(domain.OAuthTokenCallbackResult{
+			User:      u,
+			TokenPair: pair,
+		}, nil)
+
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, oauthCallback)
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/native/yandex/sdk/callback", map[string]any{
+			"access_token": "sdk-token",
+		})
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("sdk callback missing token => 400", func(t *testing.T) {
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/native/yandex/sdk/callback", map[string]any{})
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }

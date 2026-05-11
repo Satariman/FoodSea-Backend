@@ -47,6 +47,31 @@ func TestGoogleOAuthProvider_AuthURL(t *testing.T) {
 	assert.Equal(t, "state-1", q.Get("nonce"))
 }
 
+func TestGoogleOAuthProvider_AuthURL_NativeIncludesPKCE(t *testing.T) {
+	p := NewGoogleOAuthProvider(config.OAuthProviderConfig{
+		ClientID: "google-native-client",
+		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
+		Scopes:   []string{"openid", "email", "profile"},
+	}, http.DefaultClient)
+
+	got, err := p.AuthURL(context.Background(), "state-native", domain.OAuthSession{
+		Mode:         domain.OAuthFlowModeNative,
+		RedirectTo:   "foodsea://oauth/callback",
+		Nonce:        "nonce-1",
+		PKCEVerifier: "pkce-verifier-1",
+	})
+	require.NoError(t, err)
+
+	u, err := url.Parse(got)
+	require.NoError(t, err)
+	q := u.Query()
+	assert.Equal(t, "google-native-client", q.Get("client_id"))
+	assert.Equal(t, "foodsea://oauth/callback", q.Get("redirect_uri"))
+	assert.Equal(t, "nonce-1", q.Get("nonce"))
+	assert.Equal(t, "S256", q.Get("code_challenge_method"))
+	assert.NotEmpty(t, q.Get("code_challenge"))
+}
+
 func TestGoogleOAuthProvider_Exchange(t *testing.T) {
 	type tc struct {
 		name         string
@@ -181,6 +206,47 @@ func TestGoogleOAuthProvider_Exchange(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGoogleOAuthProvider_Exchange_NativeSendsCodeVerifier(t *testing.T) {
+	var gotCodeVerifier string
+	nowExp := time.Now().Add(time.Hour).Unix()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			require.NoError(t, r.ParseForm())
+			gotCodeVerifier = r.Form.Get("code_verifier")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "access",
+				"id_token": buildUnsignedJWT(map[string]any{
+					"iss":            "https://accounts.google.com",
+					"aud":            "google-native-client",
+					"exp":            nowExp,
+					"nonce":          "nonce-native",
+					"sub":            "google-sub-native",
+					"email":          "native@example.com",
+					"email_verified": true,
+				}),
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	p := NewGoogleOAuthProvider(config.OAuthProviderConfig{
+		ClientID: "google-native-client",
+		TokenURL: srv.URL + "/token",
+	}, srv.Client())
+
+	_, err := p.Exchange(context.Background(), "code", domain.OAuthSession{
+		Mode:         domain.OAuthFlowModeNative,
+		Nonce:        "nonce-native",
+		RedirectTo:   "foodsea://oauth/callback",
+		PKCEVerifier: "pkce-verifier-native",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "pkce-verifier-native", gotCodeVerifier)
 }
 
 func TestParseGoogleIDTokenClaims(t *testing.T) {

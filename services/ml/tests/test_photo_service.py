@@ -20,17 +20,37 @@ class StubEmbeddingProvider:
     model = "stub-model"
     dimensions = 3
 
-    def __init__(self, vector: np.ndarray | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        vector: np.ndarray | None = None,
+        error: Exception | None = None,
+        text_vectors: dict[str, np.ndarray] | None = None,
+        multimodal_error: Exception | None = None,
+    ) -> None:
         self._vector = vector if vector is not None else np.array([1.0, 0.0, 0.0], dtype=np.float32)
         self._error = error
+        self._text_vectors = text_vectors or {}
+        self._multimodal_error = multimodal_error
+        self.embed_texts_calls = 0
+        self.embed_multimodal_calls = 0
 
     def embed_texts(self, texts: list[str]) -> np.ndarray:
-        raise NotImplementedError
+        self.embed_texts_calls += 1
+        rows: list[np.ndarray] = []
+        for text in texts:
+            row = self._text_vectors.get(text)
+            if row is None:
+                row = self._vector
+            rows.append(np.asarray(row, dtype=np.float32))
+        return np.asarray(rows, dtype=np.float32)
 
     def embed_multimodal(self, items: list[dict[str, object]]) -> np.ndarray:
+        self.embed_multimodal_calls += 1
+        if self._multimodal_error is not None:
+            raise self._multimodal_error
         if self._error is not None:
             raise self._error
-        return np.asarray([self._vector], dtype=np.float32)
+        return np.asarray([self._vector for _ in items], dtype=np.float32)
 
 
 class DummyContext:
@@ -119,6 +139,104 @@ def test_photo_search_raises_when_index_is_missing() -> None:
         pass
 
 
+def test_photo_search_legacy_query_mode_uses_multimodal_path(monkeypatch) -> None:
+    index = build_photo_index()
+    provider = StubEmbeddingProvider(vector=np.array([1.0, 0.0, 0.0], dtype=np.float32))
+    cfg = Config()
+    monkeypatch.setattr(cfg, "PHOTO_SEARCH_INDEX_MODE", "legacy_image_only")
+    engine = PhotoSearchEngine(index=index, provider=provider, config=cfg)
+
+    result_1 = engine.search(
+        image=b"raw-image",
+        mime_type="image/jpeg",
+        ocr_text="coca cola zero sugar",
+        top_k=3,
+    )
+    result_2 = engine.search(
+        image=b"raw-image",
+        mime_type="image/jpeg",
+        ocr_text="coca cola zero sugar",
+        top_k=3,
+    )
+    assert result_1.candidates
+    assert [c.product_id for c in result_1.candidates] == [c.product_id for c in result_2.candidates]
+    assert [c.score for c in result_1.candidates] == [c.score for c in result_2.candidates]
+
+
+def test_photo_search_weighted_query_path_uses_text_and_image_channels() -> None:
+    index = build_photo_index()
+    provider = StubEmbeddingProvider(
+        vector=np.array([0.6, 0.4, 0.0], dtype=np.float32),
+        text_vectors={
+            "coca cola zero sugar": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            "zero sugar": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            "coca cola": np.array([0.8, 0.2, 0.0], dtype=np.float32),
+        },
+    )
+    cfg = Config()
+    engine = PhotoSearchEngine(index=index, provider=provider, config=cfg)
+
+    result = engine.search(
+        image=b"raw-image",
+        mime_type="image/jpeg",
+        ocr_text="coca cola zero sugar",
+        top_k=3,
+    )
+
+    assert result.matched_name == "Coca Cola Zero"
+    assert result.matched_brand == "Coca Cola"
+    assert result.candidates
+    assert result.candidates[0].product_id == "a"
+    assert provider.embed_texts_calls > 0
+    assert provider.embed_multimodal_calls > 0
+
+
+def test_photo_search_weighted_query_falls_back_to_text_when_image_embedding_fails() -> None:
+    index = build_photo_index()
+    provider = StubEmbeddingProvider(
+        vector=np.array([0.0, 1.0, 0.0], dtype=np.float32),
+        text_vectors={
+            "coca cola zero sugar": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            "zero sugar": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+            "coca cola": np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        },
+        multimodal_error=RuntimeError("image path failed"),
+    )
+    cfg = Config()
+    engine = PhotoSearchEngine(index=index, provider=provider, config=cfg)
+
+    result = engine.search(
+        image=b"raw-image",
+        mime_type="image/jpeg",
+        ocr_text="coca cola zero sugar",
+        top_k=3,
+    )
+
+    assert result.candidates
+    assert result.candidates[0].product_id == "a"
+
+
+def test_photo_search_weighted_query_returns_empty_when_no_usable_channels(monkeypatch) -> None:
+    index = build_photo_index()
+    provider = StubEmbeddingProvider(vector=np.array([1.0, 0.0, 0.0], dtype=np.float32))
+    cfg = Config()
+    monkeypatch.setattr(cfg, "PHOTO_SEARCH_QUERY_WEIGHT_IMAGE", 0.0)
+    monkeypatch.setattr(cfg, "PHOTO_SEARCH_QUERY_WEIGHT_OCR_RAW", 0.0)
+    monkeypatch.setattr(cfg, "PHOTO_SEARCH_QUERY_WEIGHT_OCR_NAME", 0.0)
+    monkeypatch.setattr(cfg, "PHOTO_SEARCH_QUERY_WEIGHT_OCR_BRAND", 0.0)
+    monkeypatch.setattr(cfg, "PHOTO_SEARCH_QUERY_WEIGHT_OCR_PERCENTAGES", 0.0)
+    monkeypatch.setattr(cfg, "PHOTO_SEARCH_QUERY_WEIGHT_OCR_VOLUME", 0.0)
+    engine = PhotoSearchEngine(index=index, provider=provider, config=cfg)
+
+    result = engine.search(
+        image=b"",
+        mime_type="image/jpeg",
+        ocr_text="",
+        top_k=3,
+    )
+    assert result.candidates == []
+
+
 def test_search_by_photo_servicer_validation_and_error_mapping() -> None:
     cfg = Config()
     analog_index = AnalogIndex()
@@ -185,8 +303,9 @@ def test_search_by_photo_servicer_validation_and_error_mapping() -> None:
     failing_engine = PhotoSearchEngine(
         index=build_photo_index(),
         provider=StubEmbeddingProvider(error=ConnectionError("provider down")),
-        config=Config(),
+        config=cfg,
     )
+    cfg.PHOTO_SEARCH_INDEX_MODE = "legacy_image_only"
     enabled_servicer = AnalogServicer(
         index=analog_index,
         config=cfg,
@@ -208,7 +327,7 @@ def test_search_by_photo_servicer_validation_and_error_mapping() -> None:
     local_error_engine = PhotoSearchEngine(
         index=build_photo_index(),
         provider=StubEmbeddingProvider(error=ValueError("bad local transform")),
-        config=Config(),
+        config=cfg,
     )
     local_error_servicer = AnalogServicer(
         index=analog_index,
@@ -301,6 +420,49 @@ def test_search_by_photo_servicer_success_payload() -> None:
     assert len(response.candidates) == 3
 
 
+def test_search_by_photo_servicer_weighted_embed_texts_connection_error_maps_unavailable() -> None:
+    cfg = Config()
+    cfg.PHOTO_SEARCH_INDEX_MODE = "weighted_multimodal"
+    analog_index = AnalogIndex()
+    analog_index.build(
+        product_ids=["x"],
+        names={"x": "X"},
+        vectors=np.array([[1.0, 0.0, 0.0]], dtype=np.float32),
+        offers={"x": {"store1": 100}},
+    )
+
+    class FailingTextProvider(StubEmbeddingProvider):
+        def embed_texts(self, texts: list[str]) -> np.ndarray:
+            self.embed_texts_calls += 1
+            raise ConnectionError("text provider down")
+
+    engine = PhotoSearchEngine(
+        index=build_photo_index(),
+        provider=FailingTextProvider(vector=np.array([1.0, 0.0, 0.0], dtype=np.float32)),
+        config=cfg,
+    )
+    servicer = AnalogServicer(
+        index=analog_index,
+        config=cfg,
+        photo_search=engine,
+        photo_search_state=PhotoSearchState.READY,
+    )
+
+    ctx = DummyContext()
+    response = servicer.SearchByPhoto(
+        analogs_pb2.SearchByPhotoRequest(
+            image=b"raw-image",
+            image_mime_type="image/jpeg",
+            ocr_text="coca cola zero sugar",
+            top_k=3,
+        ),
+        ctx,
+    )
+    assert isinstance(response, analogs_pb2.SearchByPhotoResponse)
+    assert ctx.code == grpc.StatusCode.UNAVAILABLE
+    assert "photo search provider error" in ctx.details
+
+
 def test_build_photo_search_vertex_provider_is_unready_and_servicer_returns_not_ready(
     monkeypatch,
 ) -> None:
@@ -337,3 +499,42 @@ def test_build_photo_search_vertex_provider_is_unready_and_servicer_returns_not_
     )
     assert ctx.code == grpc.StatusCode.FAILED_PRECONDITION
     assert ctx.details == "photo search is not ready"
+
+
+def test_build_photo_search_index_profile_mismatch_returns_unready(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("PHOTO_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("PHOTO_SEARCH_PROVIDER", "gemini_api_key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("PHOTO_SEARCH_INDEX_PATH", str(tmp_path / "photo.pkl"))
+    monkeypatch.setenv("PHOTO_SEARCH_INDEX_MODE", "weighted_multimodal")
+
+    captured: dict[str, object] = {}
+
+    def fake_load(self, path, provider, model, dimensions, expected_profile=None):  # noqa: ANN001
+        captured["path"] = path
+        captured["provider"] = provider
+        captured["model"] = model
+        captured["dimensions"] = dimensions
+        captured["expected_profile"] = expected_profile
+        return False
+
+    monkeypatch.setattr("src.main.PhotoProductIndex.load", fake_load)
+
+    cfg = Config()
+    photo_search, state = build_photo_search(cfg)
+    assert photo_search is None
+    assert state == PhotoSearchState.UNREADY
+    assert captured["expected_profile"] == {
+        "index_mode": cfg.PHOTO_SEARCH_INDEX_MODE,
+        "build_weights": {
+            "image": cfg.PHOTO_SEARCH_BUILD_WEIGHT_IMAGE,
+            "name": cfg.PHOTO_SEARCH_BUILD_WEIGHT_NAME,
+            "brand": cfg.PHOTO_SEARCH_BUILD_WEIGHT_BRAND,
+            "category": cfg.PHOTO_SEARCH_BUILD_WEIGHT_CATEGORY,
+            "subcategory": cfg.PHOTO_SEARCH_BUILD_WEIGHT_SUBCATEGORY,
+            "description": cfg.PHOTO_SEARCH_BUILD_WEIGHT_DESCRIPTION,
+            "composition": cfg.PHOTO_SEARCH_BUILD_WEIGHT_COMPOSITION,
+            "weight": cfg.PHOTO_SEARCH_BUILD_WEIGHT_WEIGHT,
+            "full_text": cfg.PHOTO_SEARCH_BUILD_WEIGHT_FULL_TEXT,
+        },
+    }

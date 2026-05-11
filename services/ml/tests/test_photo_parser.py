@@ -22,6 +22,8 @@ def test_extracts_brand_and_name_inside_brand_scope() -> None:
     assert parsed.matched_brand == "Простоквашино"
     assert parsed.matched_name == "Молоко ультрапастеризованное 3.2%"
     assert parsed.name_confidence >= 0.55
+    assert parsed.extracted_percentages == (3.2,)
+    assert parsed.extracted_volume is None
 
 
 def test_handles_yo_equivalence_and_punctuation() -> None:
@@ -40,6 +42,8 @@ def test_handles_yo_equivalence_and_punctuation() -> None:
     assert parsed.matched_brand == "Ежик"
     assert parsed.matched_name == "Йогурт питьевой клубничный"
     assert parsed.normalized_ocr == "ежик йогурт питьевой клубничный"
+    assert parsed.extracted_percentages == ()
+    assert parsed.extracted_volume is None
 
 
 def test_falls_back_when_brand_missing() -> None:
@@ -63,6 +67,56 @@ def test_falls_back_when_brand_missing() -> None:
     assert parsed.matched_brand is None
     assert parsed.name_confidence < 0.55
     assert parsed.matched_name == "сыр сливочный"
+
+
+def test_extracts_product_name_percentages_and_volume() -> None:
+    parser = OCRProductTextParser(
+        products=[
+            ProductTextMeta(
+                product_id="1",
+                name="Сметана 20% 300г",
+                brand_name="Эконива",
+            ),
+            ProductTextMeta(
+                product_id="2",
+                name="Молоко 3.2% 930мл",
+                brand_name="Эконива",
+            ),
+        ]
+    )
+
+    parsed = parser.parse("ЭКОНИВА СМЕТАНА 20% 300г")
+
+    assert parsed.matched_brand == "Эконива"
+    assert parsed.extracted_product_name == "сметана"
+    assert parsed.extracted_percentages == (20.0,)
+    assert parsed.extracted_volume == "300 г"
+
+
+def test_extracts_name_from_noisy_multiline_ocr() -> None:
+    parser = OCRProductTextParser(
+        products=[
+            ProductTextMeta(
+                product_id="1",
+                name="Сметана 20% 180г",
+                brand_name="Эконива",
+            ),
+            ProductTextMeta(
+                product_id="2",
+                name="Молоко 3.2% 930мл",
+                brand_name="Эконива",
+            ),
+        ]
+    )
+
+    parsed = parser.parse(
+        "EKONIVA®\nЭКОНИВА\nМОЛОКО, КОТОРЫМ МЫ ГОРДИМСЯ\n20%\nСМЕТАНА"
+    )
+
+    assert parsed.matched_brand == "Эконива"
+    assert parsed.extracted_product_name == "сметана"
+    assert parsed.extracted_percentages == (20.0,)
+    assert parsed.extracted_volume is None
 
 
 def test_weak_brand_overlap_does_not_force_brand_scope() -> None:

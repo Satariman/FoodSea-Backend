@@ -35,6 +35,10 @@ type OAuthCallbackRequest struct {
 	RedirectURI string `json:"redirect_uri" binding:"required"`
 }
 
+type OAuthNativeSDKCallbackRequest struct {
+	AccessToken string `json:"access_token" binding:"required"`
+}
+
 type UserResponse struct {
 	ID             uuid.UUID `json:"id"`
 	Phone          *string   `json:"phone,omitempty"`

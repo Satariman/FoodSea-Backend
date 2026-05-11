@@ -48,10 +48,6 @@ func (p *YandexOAuthProvider) Exchange(ctx context.Context, code string, session
 	type tokenResp struct {
 		AccessToken string `json:"access_token"`
 	}
-	type userInfoResp struct {
-		ID    string  `json:"id"`
-		Email *string `json:"default_email"`
-	}
 
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
@@ -65,16 +61,43 @@ func (p *YandexOAuthProvider) Exchange(ctx context.Context, code string, session
 		return domain.OAuthProviderProfile{}, fmt.Errorf("%w: token exchange failed", sherrors.ErrUnauthorized)
 	}
 
-	var userInfo userInfoResp
-	if err := getJSONWithHeaders(ctx, p.client, p.cfg.UserInfoURL, map[string]string{
-		"Authorization": "OAuth " + token.AccessToken,
-	}, &userInfo); err != nil {
+	userInfo, err := p.fetchUserInfo(ctx, token.AccessToken)
+	if err != nil {
 		return domain.OAuthProviderProfile{}, fmt.Errorf("%w: userinfo request failed", sherrors.ErrUnauthorized)
 	}
-	if strings.TrimSpace(userInfo.ID) == "" {
-		return domain.OAuthProviderProfile{}, fmt.Errorf("%w: userinfo missing id", sherrors.ErrUnauthorized)
-	}
+	return profileFromYandexUserInfo(userInfo), nil
+}
 
+func (p *YandexOAuthProvider) ProfileFromToken(ctx context.Context, accessToken string) (domain.OAuthProviderProfile, error) {
+	if strings.TrimSpace(accessToken) == "" {
+		return domain.OAuthProviderProfile{}, fmt.Errorf("%w: yandex access token is empty", sherrors.ErrInvalidInput)
+	}
+	userInfo, err := p.fetchUserInfo(ctx, accessToken)
+	if err != nil {
+		return domain.OAuthProviderProfile{}, fmt.Errorf("%w: userinfo request failed", sherrors.ErrUnauthorized)
+	}
+	return profileFromYandexUserInfo(userInfo), nil
+}
+
+type yandexUserInfoResp struct {
+	ID    string  `json:"id"`
+	Email *string `json:"default_email"`
+}
+
+func (p *YandexOAuthProvider) fetchUserInfo(ctx context.Context, accessToken string) (yandexUserInfoResp, error) {
+	var userInfo yandexUserInfoResp
+	if err := getJSONWithHeaders(ctx, p.client, p.cfg.UserInfoURL, map[string]string{
+		"Authorization": "OAuth " + accessToken,
+	}, &userInfo); err != nil {
+		return yandexUserInfoResp{}, err
+	}
+	if strings.TrimSpace(userInfo.ID) == "" {
+		return yandexUserInfoResp{}, fmt.Errorf("%w: userinfo missing id", sherrors.ErrUnauthorized)
+	}
+	return userInfo, nil
+}
+
+func profileFromYandexUserInfo(userInfo yandexUserInfoResp) domain.OAuthProviderProfile {
 	emailVerified := userInfo.Email != nil && strings.TrimSpace(*userInfo.Email) != ""
 	if !emailVerified {
 		userInfo.Email = nil
@@ -85,5 +108,5 @@ func (p *YandexOAuthProvider) Exchange(ctx context.Context, code string, session
 		ProviderUserID: userInfo.ID,
 		Email:          userInfo.Email,
 		EmailVerified:  emailVerified,
-	}, nil
+	}
 }

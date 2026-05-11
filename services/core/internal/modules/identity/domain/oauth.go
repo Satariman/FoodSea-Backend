@@ -12,12 +12,16 @@ import (
 )
 
 type OAuthProviderKind string
+type OAuthFlowMode string
 
 const (
 	OAuthProviderGoogle OAuthProviderKind = "google"
 	OAuthProviderApple  OAuthProviderKind = "apple"
 	OAuthProviderVK     OAuthProviderKind = "vk"
 	OAuthProviderYandex OAuthProviderKind = "yandex"
+
+	OAuthFlowModeLegacy OAuthFlowMode = "legacy"
+	OAuthFlowModeNative OAuthFlowMode = "native"
 )
 
 func ParseOAuthProvider(raw string) (OAuthProviderKind, error) {
@@ -40,16 +44,20 @@ func ParseOAuthProviderName(raw string) (OAuthProviderKind, error) {
 }
 
 type OAuthSession struct {
-	State      string
-	Provider   OAuthProviderKind
-	RedirectTo string
-	CreatedAt  time.Time
-	ExpiresAt  time.Time
+	State        string
+	Provider     OAuthProviderKind
+	Mode         OAuthFlowMode
+	RedirectTo   string
+	Nonce        string
+	PKCEVerifier string
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
 }
 
 type OAuthStartRequest struct {
 	Provider   OAuthProviderKind
 	RedirectTo string
+	Mode       OAuthFlowMode
 }
 
 type OAuthStartResult struct {
@@ -58,12 +66,24 @@ type OAuthStartResult struct {
 }
 
 type OAuthCallbackRequest struct {
-	Provider OAuthProviderKind
-	State    string
-	Code     string
+	Provider    OAuthProviderKind
+	State       string
+	Code        string
+	RedirectURI string
+	Mode        OAuthFlowMode
 }
 
 type OAuthCallbackResult struct {
+	User      *User
+	TokenPair TokenPair
+}
+
+type OAuthTokenCallbackRequest struct {
+	Provider    OAuthProviderKind
+	AccessToken string
+}
+
+type OAuthTokenCallbackResult struct {
 	User      *User
 	TokenPair TokenPair
 }
@@ -96,6 +116,7 @@ type OAuthProvider interface {
 	Name() OAuthProviderKind
 	AuthURL(ctx context.Context, state string, session OAuthSession) (string, error)
 	Exchange(ctx context.Context, code string, session OAuthSession) (OAuthProviderProfile, error)
+	ProfileFromToken(ctx context.Context, accessToken string) (OAuthProviderProfile, error)
 }
 
 type OAuthIdentityRepository interface {

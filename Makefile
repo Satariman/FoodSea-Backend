@@ -3,7 +3,7 @@
         k8s-render k8s-deploy k8s-down k8s-logs k8s-status \
         migrate-core migrate-optimization migrate-ordering migrate \
         visual-profiles gemini-images-test gemini-images-brand-samples gemini-images-all-brand-samples gemini-images-submit gemini-images-status gemini-images-download import-generated-images \
-        rebuild-photo-search-index \
+        rebuild-photo-search-index photo-search-rebuild photo-search-restart-ml photo-search-verify-ml photo-search-refresh \
         atlas-diff-core atlas-diff-ordering atlas-hash \
         seed-core \
         tools
@@ -199,6 +199,73 @@ import-generated-images:
 rebuild-photo-search-index:
 	cd services/ml && $(MAKE) rebuild-photo-index
 
+photo-search-rebuild:
+	@set -e; \
+	if [ ! -f "$(PHOTO_SEARCH_ENV_FILE)" ]; then \
+		echo "Missing env file: $(PHOTO_SEARCH_ENV_FILE)"; \
+		echo "Create it from .env.photo-search.local.example"; \
+		exit 1; \
+	fi; \
+	set -a; . "$(PHOTO_SEARCH_ENV_FILE)"; set +a; \
+	if [ -z "$${GEMINI_API_KEY}" ]; then \
+		echo "GEMINI_API_KEY is required in $(PHOTO_SEARCH_ENV_FILE)"; \
+		exit 1; \
+	fi; \
+	cd services/ml; \
+	.venv/bin/python -m src.photo_search.rebuild_index
+
+photo-search-restart-ml:
+	@set -e; \
+	if [ ! -f "$(PHOTO_SEARCH_ENV_FILE)" ]; then \
+		echo "Missing env file: $(PHOTO_SEARCH_ENV_FILE)"; \
+		echo "Create it from .env.photo-search.local.example"; \
+		exit 1; \
+	fi; \
+	mkdir -p "$(DEV_STATE_DIR)"; \
+	if [ -f "$(PHOTO_SEARCH_ML_PID_FILE)" ] && kill -0 $$(cat "$(PHOTO_SEARCH_ML_PID_FILE)") 2>/dev/null; then \
+		kill $$(cat "$(PHOTO_SEARCH_ML_PID_FILE)") 2>/dev/null || true; \
+		sleep 1; \
+	fi; \
+	: > "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
+	set -a; . "$(PHOTO_SEARCH_ENV_FILE)"; set +a; \
+	(cd services/ml; nohup env CORE_GRPC_ADDR="$${CORE_GRPC_ADDR:-localhost:9091}" GRPC_PORT="$${GRPC_PORT:-50051}" .venv/bin/python -m src.main > "$(CURDIR)/$(PHOTO_SEARCH_ML_LOG_FILE)" 2>&1 < /dev/null & echo $$! > "$(CURDIR)/$(PHOTO_SEARCH_ML_PID_FILE)"); \
+	echo "ml-service restarted, pid=$$(cat "$(PHOTO_SEARCH_ML_PID_FILE)")"
+
+photo-search-verify-ml:
+	@set -e; \
+	if [ ! -f "$(PHOTO_SEARCH_ML_PID_FILE)" ]; then \
+		echo "Missing pid file: $(PHOTO_SEARCH_ML_PID_FILE)"; \
+		exit 1; \
+	fi; \
+	pid=$$(cat "$(PHOTO_SEARCH_ML_PID_FILE)"); \
+	if ! kill -0 "$$pid" 2>/dev/null; then \
+		echo "ml-service is not running (pid=$$pid)"; \
+		echo "Last logs:"; \
+		tail -n 80 "$(PHOTO_SEARCH_ML_LOG_FILE)" || true; \
+		exit 1; \
+	fi; \
+	attempts=$(PHOTO_SEARCH_READY_TIMEOUT_SECONDS); \
+	while [ "$$attempts" -gt 0 ]; do \
+		if grep -q "photo search enabled with provider=" "$(PHOTO_SEARCH_ML_LOG_FILE)"; then \
+			echo "OK: photo search enabled"; \
+			tail -n 20 "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
+			exit 0; \
+		fi; \
+		if grep -q "photo search index not loaded" "$(PHOTO_SEARCH_ML_LOG_FILE)" || grep -q "photo search provider is not configured" "$(PHOTO_SEARCH_ML_LOG_FILE)"; then \
+			echo "Photo search is not ready. Check log lines below."; \
+			tail -n 80 "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+		attempts=$$((attempts - 1)); \
+	done; \
+	echo "Timeout waiting for photo search readiness ($(PHOTO_SEARCH_READY_TIMEOUT_SECONDS)s)"; \
+	tail -n 80 "$(PHOTO_SEARCH_ML_LOG_FILE)"; \
+	exit 1
+
+photo-search-refresh: photo-search-rebuild photo-search-restart-ml photo-search-verify-ml
+	@echo "Photo-search index rebuilt, ml-service restarted, readiness verified."
+
 # ── Lint ─────────────────────────────────────────────────────────────────────
 
 lint:
@@ -221,6 +288,10 @@ CORE_DB_URL      ?= postgres://postgres:postgres@localhost:5433/core_db?sslmode=
 OPTIMIZATION_DB_URL ?= postgres://postgres:postgres@localhost:5434/optimization_db?sslmode=disable
 ORDERING_DB_URL  ?= postgres://postgres:postgres@localhost:5435/ordering_db?sslmode=disable
 DEV_STATE_DIR    ?= .dev
+PHOTO_SEARCH_ENV_FILE ?= .env.photo-search.local
+PHOTO_SEARCH_ML_LOG_FILE ?= $(DEV_STATE_DIR)/ml.log
+PHOTO_SEARCH_ML_PID_FILE ?= $(DEV_STATE_DIR)/ml.pid
+PHOTO_SEARCH_READY_TIMEOUT_SECONDS ?= 45
 OAUTH_STATE_TTL  ?= 10m
 OAUTH_ALLOWED_REDIRECT_URIS ?= http://localhost:3000/oauth/callback
 OAUTH_NATIVE_ALLOWED_REDIRECT_URIS ?= app://foodsea/oauth/callback,http://localhost:3000/oauth/callback

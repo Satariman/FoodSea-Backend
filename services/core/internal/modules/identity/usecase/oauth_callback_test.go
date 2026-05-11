@@ -61,7 +61,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		users.On("GetByID", ctx, userID).Return(u, nil).Once()
 		tokens.On("IssuePair", ctx, userID).Return(pair, nil).Once()
 
-		got, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s1", Code: "code-1"})
+		got, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s1", Code: "code-1", RedirectURI: "/cb"})
 		require.NoError(t, err)
 		assert.Equal(t, userID, got.User.ID)
 		assert.Equal(t, pair.Access, got.TokenPair.Access)
@@ -96,7 +96,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		})).Return(nil).Once()
 		tokens.On("IssuePair", ctx, userID).Return(fakePair(), nil).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s2", Code: "code-2"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s2", Code: "code-2", RedirectURI: "/cb"})
 		require.NoError(t, err)
 	})
 
@@ -132,7 +132,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		})).Return(nil).Once()
 		tokens.On("IssuePair", ctx, mock.AnythingOfType("uuid.UUID")).Return(fakePair(), nil).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s3", Code: "code-3"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s3", Code: "code-3", RedirectURI: "/cb"})
 		require.NoError(t, err)
 	})
 
@@ -157,7 +157,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		}, nil).Once()
 		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-4").Return(nil, sherrors.ErrNotFound).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s4", Code: "code-4"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s4", Code: "code-4", RedirectURI: "/cb"})
 		assert.ErrorIs(t, err, sherrors.ErrConflict)
 	})
 
@@ -171,7 +171,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		uc := newUC(states, provider, identities, users, tokens)
 		states.On("Consume", ctx, "reused").Return(domain.OAuthSession{}, sherrors.ErrUnauthorized).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "reused", Code: "code"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "reused", Code: "code", RedirectURI: "/cb"})
 		assert.ErrorIs(t, err, sherrors.ErrUnauthorized)
 	})
 
@@ -188,7 +188,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 			RedirectTo: "",
 		}, nil).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s5", Code: "code"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s5", Code: "code", RedirectURI: "/cb"})
 		assert.ErrorIs(t, err, sherrors.ErrUnauthorized)
 	})
 
@@ -206,13 +206,13 @@ func TestOAuthCallback_Execute(t *testing.T) {
 			RedirectTo: "/cb",
 		}).Return(domain.OAuthProviderProfile{}, sherrors.ErrUnauthorized).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s6", Code: "bad-code"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s6", Code: "bad-code", RedirectURI: "/cb"})
 		assert.ErrorIs(t, err, sherrors.ErrUnauthorized)
 	})
 
 	t.Run("callback malformed input invalid input", func(t *testing.T) {
 		uc := newUC(new(MockOAuthStateStore), new(MockOAuthProvider), new(MockOAuthIdentityRepository), new(MockUserRepository), new(MockTokenService))
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: "", State: "", Code: ""})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: "", State: "", Code: "", RedirectURI: "/cb"})
 		assert.ErrorIs(t, err, sherrors.ErrInvalidInput)
 	})
 
@@ -225,9 +225,10 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		uc := newUC(states, provider, identities, users, tokens)
 
 		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{
-			Provider: domain.OAuthProviderVK,
-			State:    "state",
-			Code:     "code",
+			Provider:    domain.OAuthProviderVK,
+			State:       "state",
+			Code:        "code",
+			RedirectURI: "/cb",
 		})
 		assert.ErrorIs(t, err, sherrors.ErrInvalidInput)
 	})
@@ -252,7 +253,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		}, nil).Once()
 		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-7").Return(nil, errors.New("db down")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s7", Code: "code-7"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s7", Code: "code-7", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "db down", err.Error())
 	})
@@ -287,7 +288,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		users.On("GetByID", ctx, userID).Return(localUser, nil).Once()
 		tokens.On("IssuePair", ctx, userID).Return(fakePair(), nil).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s8", Code: "code-8"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s8", Code: "code-8", RedirectURI: "/cb"})
 		require.NoError(t, err)
 	})
 
@@ -301,7 +302,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 
 		states.On("Consume", ctx, "s9").Return(domain.OAuthSession{}, errors.New("redis down")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s9", Code: "code"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s9", Code: "code", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "redis down", err.Error())
 	})
@@ -319,7 +320,31 @@ func TestOAuthCallback_Execute(t *testing.T) {
 			RedirectTo: "/cb",
 		}, nil).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s10", Code: "code"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s10", Code: "code", RedirectURI: "/cb"})
+		assert.ErrorIs(t, err, sherrors.ErrUnauthorized)
+	})
+
+	t.Run("callback mode mismatch unauthorized", func(t *testing.T) {
+		states := new(MockOAuthStateStore)
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(states, provider, identities, users, tokens)
+
+		states.On("Consume", ctx, "s10m").Return(domain.OAuthSession{
+			Provider:   domain.OAuthProviderGoogle,
+			RedirectTo: "/cb",
+			Mode:       domain.OAuthFlowModeNative,
+		}, nil).Once()
+
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{
+			Provider:    domain.OAuthProviderGoogle,
+			State:       "s10m",
+			Code:        "code",
+			RedirectURI: "/cb",
+			Mode:        domain.OAuthFlowModeLegacy,
+		})
 		assert.ErrorIs(t, err, sherrors.ErrUnauthorized)
 	})
 
@@ -337,7 +362,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 			RedirectTo: "/cb",
 		}).Return(domain.OAuthProviderProfile{}, errors.New("provider timeout")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s11", Code: "code-11"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s11", Code: "code-11", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "provider timeout", err.Error())
 	})
@@ -366,7 +391,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		}, nil).Once()
 		users.On("GetByID", ctx, userID).Return(nil, errors.New("user lookup failed")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s12", Code: "code-12"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s12", Code: "code-12", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "user lookup failed", err.Error())
 	})
@@ -393,7 +418,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-13").Return(nil, sherrors.ErrNotFound).Once()
 		users.On("GetByEmail", ctx, email).Return(nil, errors.New("db down")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s13", Code: "code-13"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s13", Code: "code-13", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "db down", err.Error())
 	})
@@ -421,7 +446,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		users.On("GetByEmail", ctx, email).Return(nil, sherrors.ErrNotFound).Once()
 		users.On("CreateOAuth", ctx, mock.AnythingOfType("*domain.User")).Return(errors.New("insert failed")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s14", Code: "code-14"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s14", Code: "code-14", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "insert failed", err.Error())
 	})
@@ -450,7 +475,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		users.On("GetByEmail", ctx, email).Return(localUser, nil).Once()
 		identities.On("Create", ctx, mock.AnythingOfType("*domain.OAuthIdentity")).Return(errors.New("identity create failed")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s15", Code: "code-15"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s15", Code: "code-15", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "identity create failed", err.Error())
 	})
@@ -480,7 +505,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		identities.On("Create", ctx, mock.AnythingOfType("*domain.OAuthIdentity")).Return(sherrors.ErrAlreadyExists).Once()
 		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-16").Return(nil, errors.New("identity lookup failed")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s16", Code: "code-16"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s16", Code: "code-16", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "identity lookup failed", err.Error())
 	})
@@ -512,7 +537,7 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderGoogle, "sub-17").Return(linkedIdentity, nil).Once()
 		users.On("GetByID", ctx, linkedIdentity.UserID).Return(nil, errors.New("linked user fetch failed")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s17", Code: "code-17"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s17", Code: "code-17", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "linked user fetch failed", err.Error())
 	})
@@ -543,8 +568,65 @@ func TestOAuthCallback_Execute(t *testing.T) {
 		users.On("GetByID", ctx, userID).Return(u, nil).Once()
 		tokens.On("IssuePair", ctx, userID).Return(domain.TokenPair{}, errors.New("token service down")).Once()
 
-		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s18", Code: "code-18"})
+		_, err := uc.Execute(ctx, domain.OAuthCallbackRequest{Provider: domain.OAuthProviderGoogle, State: "s18", Code: "code-18", RedirectURI: "/cb"})
 		require.Error(t, err)
 		assert.Equal(t, "token service down", err.Error())
+	})
+}
+
+func TestOAuthCallback_ExecuteToken(t *testing.T) {
+	ctx := context.Background()
+
+	newUC := func(
+		provider *MockOAuthProvider,
+		identities *MockOAuthIdentityRepository,
+		users *MockUserRepository,
+		tokens *MockTokenService,
+	) *usecase.OAuthCallback {
+		provider.On("Name").Return(domain.OAuthProviderYandex).Once()
+		return usecase.NewOAuthCallback(new(MockOAuthStateStore), []domain.OAuthProvider{provider}, identities, users, tokens)
+	}
+
+	t.Run("token callback success", func(t *testing.T) {
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(provider, identities, users, tokens)
+
+		userID := uuid.New()
+		email := "sdk@example.com"
+		u := &domain.User{ID: userID, Email: &email}
+		pair := fakePair()
+
+		provider.On("ProfileFromToken", ctx, "sdk-token").Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderYandex,
+			ProviderUserID: "yandex-id-1",
+			Email:          &email,
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderYandex, "yandex-id-1").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("GetByEmail", ctx, email).Return(u, nil).Once()
+		identities.On("Create", ctx, mock.AnythingOfType("*domain.OAuthIdentity")).Return(nil).Once()
+		tokens.On("IssuePair", ctx, userID).Return(pair, nil).Once()
+
+		result, err := uc.ExecuteToken(ctx, domain.OAuthTokenCallbackRequest{
+			Provider:    domain.OAuthProviderYandex,
+			AccessToken: "sdk-token",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, pair.Access, result.TokenPair.Access)
+		assert.Equal(t, userID, result.User.ID)
+	})
+
+	t.Run("token callback malformed input", func(t *testing.T) {
+		provider := new(MockOAuthProvider)
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := newUC(provider, identities, users, tokens)
+
+		_, err := uc.ExecuteToken(ctx, domain.OAuthTokenCallbackRequest{})
+		assert.ErrorIs(t, err, sherrors.ErrInvalidInput)
 	})
 }

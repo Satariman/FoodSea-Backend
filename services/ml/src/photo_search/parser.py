@@ -6,6 +6,8 @@ from typing import Iterable
 
 
 _TOKEN_RE = re.compile(r"[a-zа-я0-9]+", flags=re.IGNORECASE)
+_PERCENT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+_VOLUME_RE = re.compile(r"\b(\d+(?:\.\d+)?)\s*(мл|л|г|гр|кг)\b")
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,9 @@ class ParsedOCR:
     matched_brand: str | None
     normalized_ocr: str
     name_confidence: float
+    extracted_product_name: str | None
+    extracted_percentages: tuple[float, ...]
+    extracted_volume: str | None
 
 
 @dataclass(frozen=True)
@@ -40,12 +45,21 @@ class OCRProductTextParser:
         self._products = [self._index_product(product) for product in products]
 
     def parse(self, text: str) -> ParsedOCR:
-        normalized_ocr = self._normalize_text(text)
+        canonical_text = self._canonicalize_text(text)
+        normalized_ocr = self._normalize_text(canonical_text)
         ocr_tokens = self._tokenize(normalized_ocr)
 
         matched_brand = self._match_brand(ocr_tokens)
         matched_product, name_confidence = self._match_product(ocr_tokens, matched_brand)
         matched_name = matched_product.meta.name if matched_product else None
+        extracted_percentages = self._extract_percentages(canonical_text)
+        extracted_volume = self._extract_volume(canonical_text)
+        extracted_product_name = self._extract_product_name(
+            normalized_ocr,
+            matched_brand,
+            extracted_percentages,
+            extracted_volume,
+        )
 
         if name_confidence < self._LOW_CONFIDENCE_THRESHOLD:
             matched_name = self._fallback_name_snippet(normalized_ocr)
@@ -55,6 +69,9 @@ class OCRProductTextParser:
             matched_brand=matched_brand,
             normalized_ocr=normalized_ocr,
             name_confidence=name_confidence,
+            extracted_product_name=extracted_product_name,
+            extracted_percentages=extracted_percentages,
+            extracted_volume=extracted_volume,
         )
 
     def _match_brand(self, ocr_tokens: tuple[str, ...]) -> str | None:
@@ -117,9 +134,14 @@ class OCRProductTextParser:
 
     @staticmethod
     def _normalize_text(text: str) -> str:
+        return " ".join(_TOKEN_RE.findall(OCRProductTextParser._canonicalize_text(text)))
+
+    @staticmethod
+    def _canonicalize_text(text: str) -> str:
         lowered = text.lower().replace("ё", "е").replace("Ё", "Е")
         lowered = lowered.replace(",", ".")
-        return " ".join(_TOKEN_RE.findall(lowered))
+        lowered = re.sub(r"\s+", " ", lowered)
+        return lowered.strip()
 
     @staticmethod
     def _tokenize(text: str) -> tuple[str, ...]:
@@ -168,3 +190,168 @@ class OCRProductTextParser:
         if not tokens:
             return None
         return " ".join(tokens[:max_tokens])
+
+    @staticmethod
+    def _extract_percentages(canonical_text: str) -> tuple[float, ...]:
+        seen: set[float] = set()
+        values: list[float] = []
+        for raw in _PERCENT_RE.findall(canonical_text):
+            value = float(raw)
+            if value in seen:
+                continue
+            seen.add(value)
+            values.append(value)
+        return tuple(values)
+
+    @staticmethod
+    def _extract_volume(canonical_text: str) -> str | None:
+        match = _VOLUME_RE.search(canonical_text)
+        if match is None:
+            return None
+        value = OCRProductTextParser._normalize_number(float(match.group(1)))
+        unit = match.group(2)
+        if unit == "гр":
+            unit = "г"
+        return f"{value} {unit}"
+
+    @staticmethod
+    def _extract_product_name(
+        normalized_ocr: str,
+        matched_brand: str | None,
+        percentages: tuple[float, ...],
+        volume: str | None,
+    ) -> str | None:
+        tokens = OCRProductTextParser._tokenize(normalized_ocr)
+        if not tokens:
+            return None
+
+        drop_tokens = {
+            "акция",
+            "скидка",
+            "новинка",
+            "которым",
+            "которые",
+            "мы",
+            "гордимся",
+            "процент",
+            "процентов",
+            "мл",
+            "л",
+            "г",
+            "гр",
+            "кг",
+        }
+        if matched_brand:
+            brand_normalized = OCRProductTextParser._normalize_text(
+                OCRProductTextParser._canonicalize_text(matched_brand)
+            )
+            drop_tokens.update(
+                OCRProductTextParser._tokenize(
+                    brand_normalized
+                )
+            )
+            drop_tokens.update(
+                OCRProductTextParser._tokenize(
+                    OCRProductTextParser._normalize_text(
+                        OCRProductTextParser._transliterate_ru_to_lat(brand_normalized)
+                    )
+                )
+            )
+        if volume:
+            drop_tokens.update(
+                OCRProductTextParser._tokenize(
+                    OCRProductTextParser._normalize_text(
+                        OCRProductTextParser._canonicalize_text(volume)
+                    )
+                )
+            )
+            drop_tokens.update(
+                OCRProductTextParser._tokenize(
+                    OCRProductTextParser._normalize_text(
+                        OCRProductTextParser._canonicalize_text(volume.replace(" ", ""))
+                    )
+                )
+            )
+        for percent in percentages:
+            percent_token_source = OCRProductTextParser._normalize_number(percent)
+            drop_tokens.update(
+                OCRProductTextParser._tokenize(
+                    OCRProductTextParser._normalize_text(percent_token_source)
+                )
+            )
+
+        filtered_with_index = [
+            (index, token)
+            for index, token in enumerate(tokens)
+            if token not in drop_tokens
+        ]
+        filtered = [token for _, token in filtered_with_index]
+        if not filtered:
+            return None
+
+        percent_tokens = set()
+        for percent in percentages:
+            percent_tokens.update(
+                OCRProductTextParser._tokenize(
+                    OCRProductTextParser._normalize_text(
+                        OCRProductTextParser._normalize_number(percent)
+                    )
+                )
+            )
+        percent_positions = [
+            index for index, token in enumerate(tokens) if token in percent_tokens
+        ]
+        if percent_positions:
+            last_percent_position = max(percent_positions)
+            tail = [
+                token for index, token in filtered_with_index if index > last_percent_position
+            ]
+            if tail:
+                return " ".join(tail[:8])
+
+        return " ".join(filtered[:8])
+
+    @staticmethod
+    def _normalize_number(value: float) -> str:
+        if value.is_integer():
+            return str(int(value))
+        return f"{value:.6f}".rstrip("0").rstrip(".")
+
+    @staticmethod
+    def _transliterate_ru_to_lat(text: str) -> str:
+        table = {
+            "а": "a",
+            "б": "b",
+            "в": "v",
+            "г": "g",
+            "д": "d",
+            "е": "e",
+            "ж": "zh",
+            "з": "z",
+            "и": "i",
+            "й": "i",
+            "к": "k",
+            "л": "l",
+            "м": "m",
+            "н": "n",
+            "о": "o",
+            "п": "p",
+            "р": "r",
+            "с": "s",
+            "т": "t",
+            "у": "u",
+            "ф": "f",
+            "х": "h",
+            "ц": "ts",
+            "ч": "ch",
+            "ш": "sh",
+            "щ": "sch",
+            "ы": "y",
+            "э": "e",
+            "ю": "yu",
+            "я": "ya",
+            "ь": "",
+            "ъ": "",
+            " ": " ",
+        }
+        return "".join(table.get(char, char) for char in text)

@@ -30,8 +30,14 @@ class FakeProvider:
             rows.append(row)
         return np.stack(rows, axis=0)
 
-    def embed_multimodal(self, items):  # pragma: no cover - not used in rebuild flow
-        raise NotImplementedError
+    def embed_multimodal(self, items):  # pragma: no cover - overridden where needed
+        rows = []
+        for item in items:
+            seed = len(str(item.get("text") or "")) + len(bytes(item.get("image_bytes") or b""))
+            row = np.zeros((self.dimensions,), dtype=np.float32)
+            row[seed % self.dimensions] = 1.0
+            rows.append(row)
+        return np.stack(rows, axis=0) if rows else np.empty((0, self.dimensions), dtype=np.float32)
 
 
 def _product(
@@ -90,6 +96,18 @@ def test_build_photo_index_with_fake_provider(tmp_path) -> None:
         provider=provider,
         index_path=str(index_path),
         batch_size=1,
+        index_mode="weighted_multimodal",
+        build_weights={
+            "image": 0.0,
+            "name": 1.0,
+            "brand": 0.0,
+            "category": 0.0,
+            "subcategory": 0.0,
+            "description": 0.0,
+            "composition": 0.0,
+            "weight": 0.0,
+            "full_text": 0.0,
+        },
     )
 
     assert index_path.exists()
@@ -113,11 +131,23 @@ def test_build_photo_index_skips_products_with_empty_text(tmp_path) -> None:
         provider=provider,
         index_path=str(index_path),
         batch_size=16,
+        index_mode="weighted_multimodal",
+        build_weights={
+            "image": 0.0,
+            "name": 1.0,
+            "brand": 0.0,
+            "category": 0.0,
+            "subcategory": 0.0,
+            "description": 0.0,
+            "composition": 0.0,
+            "weight": 0.0,
+            "full_text": 0.0,
+        },
     )
 
     assert index_path.exists()
     assert index.product_ids == ["p-valid"]
-    assert provider.calls == [["Yogurt | Brand | Dairy | Milk | Ultra pasteurized | Milk | 900 ml"]]
+    assert provider.calls == [["Yogurt"]]
 
 
 def test_build_photo_index_fails_when_all_products_have_empty_text(tmp_path) -> None:
@@ -128,13 +158,132 @@ def test_build_photo_index_fails_when_all_products_have_empty_text(tmp_path) -> 
     ]
     index_path = tmp_path / "photo_index_empty.pkl"
 
-    with pytest.raises(ValueError, match="all products have empty text"):
+    with pytest.raises(ValueError, match="no valid products for photo index rebuild"):
         build_photo_index(
             products=products,
             provider=provider,
             index_path=str(index_path),
             batch_size=8,
+            index_mode="weighted_multimodal",
+            build_weights={
+                "image": 0.0,
+                "name": 1.0,
+                "brand": 0.0,
+                "category": 0.0,
+                "subcategory": 0.0,
+                "description": 0.0,
+                "composition": 0.0,
+                "weight": 0.0,
+                "full_text": 0.0,
+            },
         )
+
+
+def test_build_photo_index_weighted_multimodal_fallback_to_text_when_image_unavailable(
+    monkeypatch, tmp_path
+) -> None:
+    class FailingImageProvider(FakeProvider):
+        def embed_multimodal(self, items):
+            raise RuntimeError("image embedding failed")
+
+    provider = FailingImageProvider(dimensions=4)
+    products = [_product("p-1"), _product("p-2", name="Yogurt")]
+    index_path = tmp_path / "photo_index_weighted.pkl"
+    monkeypatch.setattr(
+        "src.photo_search.rebuild_index.fetch_image_bytes",
+        lambda url: (_ for _ in ()).throw(RuntimeError("download error")),
+    )
+
+    index = build_photo_index(
+        products=products,
+        provider=provider,
+        index_path=str(index_path),
+        batch_size=2,
+        index_mode="weighted_multimodal",
+        build_weights={
+            "image": 0.4,
+            "name": 0.6,
+            "brand": 0.0,
+            "category": 0.0,
+            "subcategory": 0.0,
+            "description": 0.0,
+            "composition": 0.0,
+            "weight": 0.0,
+            "full_text": 0.0,
+        },
+    )
+
+    assert index.product_ids == ["p-1", "p-2"]
+    assert index_path.exists()
+
+
+def test_build_photo_index_weighted_multimodal_skips_product_without_any_channels(tmp_path) -> None:
+    provider = FakeProvider(dimensions=4)
+    products = [
+        _product(
+            "p-invalid",
+            name=" ",
+            brand_name=" ",
+            category_name=" ",
+            subcategory_name=" ",
+            description=" ",
+            composition=" ",
+            weight=" ",
+            image_url="",
+        ),
+        _product("p-valid", name="Yogurt"),
+    ]
+    index = build_photo_index(
+        products=products,
+        provider=provider,
+        index_path=str(tmp_path / "photo_index_skip_invalid.pkl"),
+        batch_size=4,
+        index_mode="weighted_multimodal",
+        build_weights={
+            "image": 0.1,
+            "name": 0.9,
+            "brand": 0.0,
+            "category": 0.0,
+            "subcategory": 0.0,
+            "description": 0.0,
+            "composition": 0.0,
+            "weight": 0.0,
+            "full_text": 0.0,
+        },
+    )
+    assert index.product_ids == ["p-valid"]
+
+
+def test_build_photo_index_legacy_image_only_path(monkeypatch, tmp_path) -> None:
+    class LegacyProvider(FakeProvider):
+        def __init__(self, dimensions: int = 4) -> None:
+            super().__init__(dimensions=dimensions)
+            self.mm_calls = 0
+
+        def embed_multimodal(self, items):
+            self.mm_calls += 1
+            rows = []
+            for i, _ in enumerate(items):
+                row = np.zeros((self.dimensions,), dtype=np.float32)
+                row[i % self.dimensions] = 1.0
+                rows.append(row)
+            return np.stack(rows, axis=0)
+
+    provider = LegacyProvider(dimensions=4)
+    monkeypatch.setattr(
+        "src.photo_search.rebuild_index.fetch_image_bytes",
+        lambda url: (b"img", "image/jpeg"),
+    )
+    products = [_product("p-1"), _product("p-2", name="Yogurt")]
+    index = build_photo_index(
+        products=products,
+        provider=provider,
+        index_path=str(tmp_path / "photo_index_legacy.pkl"),
+        batch_size=1,
+        index_mode="legacy_image_only",
+    )
+    assert index.product_ids == ["p-1", "p-2"]
+    assert provider.mm_calls == 2
 
 
 def test_provider_from_config_gemini_requires_key() -> None:
@@ -176,6 +325,16 @@ def test_main_loads_products_and_saves_index(monkeypatch, tmp_path) -> None:
         CORE_GRPC_ADDR = "localhost:9091"
         PHOTO_SEARCH_INDEX_PATH = str(tmp_path / "rebuilt.pkl")
         PHOTO_SEARCH_BATCH_SIZE = 2
+        PHOTO_SEARCH_INDEX_MODE = "weighted_multimodal"
+        PHOTO_SEARCH_BUILD_WEIGHT_IMAGE = 0.0
+        PHOTO_SEARCH_BUILD_WEIGHT_NAME = 1.0
+        PHOTO_SEARCH_BUILD_WEIGHT_BRAND = 0.0
+        PHOTO_SEARCH_BUILD_WEIGHT_CATEGORY = 0.0
+        PHOTO_SEARCH_BUILD_WEIGHT_SUBCATEGORY = 0.0
+        PHOTO_SEARCH_BUILD_WEIGHT_DESCRIPTION = 0.0
+        PHOTO_SEARCH_BUILD_WEIGHT_COMPOSITION = 0.0
+        PHOTO_SEARCH_BUILD_WEIGHT_WEIGHT = 0.0
+        PHOTO_SEARCH_BUILD_WEIGHT_FULL_TEXT = 0.0
 
     fake_provider = FakeProvider(dimensions=4)
 

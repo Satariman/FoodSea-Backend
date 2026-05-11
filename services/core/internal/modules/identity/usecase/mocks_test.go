@@ -141,6 +141,14 @@ func (m *MockOAuthProvider) Exchange(ctx context.Context, code string, session d
 	return args.Get(0).(domain.OAuthProviderProfile), args.Error(1)
 }
 
+func (m *MockOAuthProvider) ProfileFromToken(ctx context.Context, accessToken string) (domain.OAuthProviderProfile, error) {
+	args := m.Called(ctx, accessToken)
+	if args.Get(0) == nil {
+		return domain.OAuthProviderProfile{}, args.Error(1)
+	}
+	return args.Get(0).(domain.OAuthProviderProfile), args.Error(1)
+}
+
 type MockOAuthIdentityRepository struct {
 	mock.Mock
 }

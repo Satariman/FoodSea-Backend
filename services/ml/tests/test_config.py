@@ -137,3 +137,86 @@ def test_get_bool_env_uses_default_when_missing(monkeypatch) -> None:
     monkeypatch.delenv("BOOL_VAR", raising=False)
     assert _get_bool_env("BOOL_VAR", True) is True
     assert _get_bool_env("BOOL_VAR", False) is False
+
+
+def test_photo_search_enabled_invalid_bool_fails_fast(monkeypatch) -> None:
+    monkeypatch.setenv("PHOTO_SEARCH_ENABLED", "maybe")
+
+    with pytest.raises(ValueError, match="PHOTO_SEARCH_ENABLED"):
+        Config()
+
+
+@pytest.mark.parametrize(
+    ("env_name", "value"),
+    [
+        ("PHOTO_SEARCH_MIN_SCORE", "-0.1"),
+        ("PHOTO_SEARCH_MIN_SCORE", "1.1"),
+        ("MIN_SCORE_THRESHOLD", "-0.2"),
+        ("MIN_SCORE_THRESHOLD", "1.2"),
+    ],
+)
+def test_thresholds_must_be_between_zero_and_one(monkeypatch, env_name: str, value: str) -> None:
+    monkeypatch.setenv(env_name, value)
+
+    with pytest.raises(ValueError, match=env_name):
+        Config()
+
+
+@pytest.mark.parametrize(
+    ("env_name", "value"),
+    [
+        ("TEXT_WEIGHT", "-1"),
+        ("PHOTO_SEARCH_BUILD_WEIGHT_IMAGE", "-0.01"),
+        ("PHOTO_SEARCH_QUERY_WEIGHT_OCR_RAW", "-0.1"),
+    ],
+)
+def test_weights_must_be_non_negative(monkeypatch, env_name: str, value: str) -> None:
+    monkeypatch.setenv(env_name, value)
+
+    with pytest.raises(ValueError, match=env_name):
+        Config()
+
+
+@pytest.mark.parametrize(
+    ("env_name", "value"),
+    [
+        ("TEXT_WEIGHT", "NaN"),
+        ("CATEGORY_WEIGHT", "inf"),
+        ("PHOTO_SEARCH_MIN_SCORE", "-inf"),
+    ],
+)
+def test_float_values_must_be_finite(monkeypatch, env_name: str, value: str) -> None:
+    monkeypatch.setenv(env_name, value)
+
+    with pytest.raises(ValueError, match=env_name):
+        Config()
+
+
+@pytest.mark.parametrize(
+    ("env_name", "value"),
+    [
+        ("GRPC_PORT", "0"),
+        ("PHOTO_SEARCH_DIMENSIONS", "-10"),
+        ("PHOTO_SEARCH_BATCH_SIZE", "0"),
+    ],
+)
+def test_positive_integer_fields(monkeypatch, env_name: str, value: str) -> None:
+    monkeypatch.setenv(env_name, value)
+
+    with pytest.raises(ValueError, match=env_name):
+        Config()
+
+
+def test_photo_search_index_mode_enum_validation(monkeypatch) -> None:
+    monkeypatch.setenv("PHOTO_SEARCH_INDEX_MODE", "bad_mode")
+
+    with pytest.raises(ValueError, match="PHOTO_SEARCH_INDEX_MODE"):
+        Config()
+
+
+def test_photo_search_index_mode_accepted_values(monkeypatch) -> None:
+    monkeypatch.setenv("PHOTO_SEARCH_INDEX_MODE", "legacy_image_only")
+    assert Config().PHOTO_SEARCH_INDEX_MODE == "legacy_image_only"
+
+    monkeypatch.setenv("PHOTO_SEARCH_INDEX_MODE", "weighted_multimodal")
+    assert Config().PHOTO_SEARCH_INDEX_MODE == "weighted_multimodal"

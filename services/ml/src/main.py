@@ -25,6 +25,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
+def _photo_search_build_weights(config: Config) -> dict[str, float]:
+    return {
+        "image": float(config.PHOTO_SEARCH_BUILD_WEIGHT_IMAGE),
+        "name": float(config.PHOTO_SEARCH_BUILD_WEIGHT_NAME),
+        "brand": float(config.PHOTO_SEARCH_BUILD_WEIGHT_BRAND),
+        "category": float(config.PHOTO_SEARCH_BUILD_WEIGHT_CATEGORY),
+        "subcategory": float(config.PHOTO_SEARCH_BUILD_WEIGHT_SUBCATEGORY),
+        "description": float(config.PHOTO_SEARCH_BUILD_WEIGHT_DESCRIPTION),
+        "composition": float(config.PHOTO_SEARCH_BUILD_WEIGHT_COMPOSITION),
+        "weight": float(config.PHOTO_SEARCH_BUILD_WEIGHT_WEIGHT),
+        "full_text": float(config.PHOTO_SEARCH_BUILD_WEIGHT_FULL_TEXT),
+    }
+
+
 def build_index(config: Config) -> AnalogIndex:
     index = AnalogIndex()
 
@@ -101,6 +115,10 @@ def build_photo_search(config: Config) -> tuple[PhotoSearchEngine | None, PhotoS
         provider=provider.provider_name,
         model=provider.model,
         dimensions=provider.dimensions,
+        expected_profile={
+            "index_mode": config.PHOTO_SEARCH_INDEX_MODE,
+            "build_weights": _photo_search_build_weights(config),
+        },
     )
     if not loaded:
         logger.warning("photo search index not loaded from %s", config.PHOTO_SEARCH_INDEX_PATH)

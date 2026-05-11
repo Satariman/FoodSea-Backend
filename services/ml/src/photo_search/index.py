@@ -43,6 +43,8 @@ class PhotoProductIndex:
         self.provider: str = ""
         self.model: str = ""
         self.dimensions: int = 0
+        self.index_mode: str = ""
+        self.build_weights: dict[str, float] = {}
 
     def product_metas(self) -> list[PhotoProductMeta]:
         by_id = {meta.product_id: meta for meta in self.metas}
@@ -55,8 +57,12 @@ class PhotoProductIndex:
         provider: str,
         model: str,
         dimensions: int,
+        index_mode: str | None = None,
+        build_weights: dict[str, float] | None = None,
     ) -> None:
         normalized = normalize_rows(vectors)
+        if not np.all(np.isfinite(normalized)):
+            raise ValueError("vectors must contain only finite values")
         if len(metas) != normalized.shape[0]:
             raise ValueError("metas length must match vectors rows")
         if normalized.shape[0] == 0:
@@ -70,6 +76,8 @@ class PhotoProductIndex:
         self.provider = provider
         self.model = model
         self.dimensions = int(dimensions)
+        self.index_mode = str(index_mode or "")
+        self.build_weights = _sanitize_weights(build_weights)
         self.knn = NearestNeighbors(metric="cosine", algorithm="brute")
         self.knn.fit(self.vectors)
 
@@ -115,6 +123,10 @@ class PhotoProductIndex:
             "provider": self.provider,
             "model": self.model,
             "dimensions": self.dimensions,
+            "index_profile": {
+                "index_mode": self.index_mode,
+                "build_weights": self.build_weights,
+            },
             "product_ids": self.product_ids,
             "metas": self.metas,
             "vectors": self.vectors,
@@ -123,7 +135,14 @@ class PhotoProductIndex:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(pickle.dumps(payload))
 
-    def load(self, path: str, provider: str, model: str, dimensions: int) -> bool:
+    def load(
+        self,
+        path: str,
+        provider: str,
+        model: str,
+        dimensions: int,
+        expected_profile: dict[str, object] | None = None,
+    ) -> bool:
         source = Path(path)
         if not source.exists():
             return False
@@ -151,6 +170,14 @@ class PhotoProductIndex:
             return False
 
         try:
+            profile = _parse_profile(data.get("index_profile"))
+        except Exception:
+            return False
+        expected = _parse_expected_profile(expected_profile)
+        if expected is not None and profile != expected:
+            return False
+
+        try:
             vectors = np.asarray(data.get("vectors"), dtype=np.float32)
         except (TypeError, ValueError):
             return False
@@ -159,6 +186,8 @@ class PhotoProductIndex:
         if vectors.shape[0] == 0:
             return False
         if vectors.shape[1] != file_dim:
+            return False
+        if not np.all(np.isfinite(vectors)):
             return False
 
         metas_raw = data.get("metas")
@@ -185,6 +214,47 @@ class PhotoProductIndex:
         self.provider = provider
         self.model = model
         self.dimensions = file_dim
+        self.index_mode = profile["index_mode"]
+        self.build_weights = profile["build_weights"]
         self.knn = NearestNeighbors(metric="cosine", algorithm="brute")
         self.knn.fit(self.vectors)
         return True
+
+
+def _sanitize_weights(weights: dict[str, float] | None) -> dict[str, float]:
+    if weights is None:
+        return {}
+    if not isinstance(weights, dict):
+        raise ValueError("build_weights must be a dict")
+    result: dict[str, float] = {}
+    for key in sorted(weights.keys()):
+        if not isinstance(key, str):
+            raise ValueError("build_weights keys must be strings")
+        value = float(weights[key])
+        if not np.isfinite(value) or value < 0.0:
+            raise ValueError("build_weights values must be finite and >= 0")
+        result[key] = value
+    return result
+
+
+def _parse_profile(raw_profile: object) -> dict[str, object]:
+    if raw_profile is None:
+        return {"index_mode": "", "build_weights": {}}
+    if not isinstance(raw_profile, dict):
+        raise ValueError("invalid index profile")
+    mode = raw_profile.get("index_mode", "")
+    if not isinstance(mode, str):
+        raise ValueError("invalid index profile mode")
+    build_weights = _sanitize_weights(raw_profile.get("build_weights"))
+    return {"index_mode": mode, "build_weights": build_weights}
+
+
+def _parse_expected_profile(
+    expected_profile: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if expected_profile is None:
+        return None
+    try:
+        return _parse_profile(expected_profile)
+    except Exception:
+        return {"index_mode": "__invalid__", "build_weights": {}}

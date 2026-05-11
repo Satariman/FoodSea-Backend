@@ -42,8 +42,12 @@ func NewOAuthCallback(
 }
 
 func (o *OAuthCallback) Execute(ctx context.Context, req domain.OAuthCallbackRequest) (domain.OAuthCallbackResult, error) {
-	if req.Provider == "" || strings.TrimSpace(req.State) == "" || strings.TrimSpace(req.Code) == "" {
+	if req.Provider == "" || strings.TrimSpace(req.State) == "" || strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.RedirectURI) == "" {
 		return domain.OAuthCallbackResult{}, fmt.Errorf("%w: malformed oauth callback input", sherrors.ErrInvalidInput)
+	}
+	mode := req.Mode
+	if mode == "" {
+		mode = domain.OAuthFlowModeLegacy
 	}
 
 	provider, ok := o.providers[req.Provider]
@@ -59,6 +63,16 @@ func (o *OAuthCallback) Execute(ctx context.Context, req domain.OAuthCallbackReq
 		return domain.OAuthCallbackResult{}, err
 	}
 	if session.Provider != req.Provider || session.RedirectTo == "" {
+		return domain.OAuthCallbackResult{}, sherrors.ErrUnauthorized
+	}
+	sessionMode := session.Mode
+	if sessionMode == "" {
+		sessionMode = domain.OAuthFlowModeLegacy
+	}
+	if sessionMode != mode {
+		return domain.OAuthCallbackResult{}, sherrors.ErrUnauthorized
+	}
+	if session.RedirectTo != req.RedirectURI {
 		return domain.OAuthCallbackResult{}, sherrors.ErrUnauthorized
 	}
 
@@ -81,6 +95,43 @@ func (o *OAuthCallback) Execute(ctx context.Context, req domain.OAuthCallbackReq
 	}
 
 	return domain.OAuthCallbackResult{
+		User:      u,
+		TokenPair: pair,
+	}, nil
+}
+
+func (o *OAuthCallback) ExecuteToken(ctx context.Context, req domain.OAuthTokenCallbackRequest) (domain.OAuthTokenCallbackResult, error) {
+	if req.Provider == "" || strings.TrimSpace(req.AccessToken) == "" {
+		return domain.OAuthTokenCallbackResult{}, fmt.Errorf("%w: malformed oauth token callback input", sherrors.ErrInvalidInput)
+	}
+
+	provider, ok := o.providers[req.Provider]
+	if !ok {
+		return domain.OAuthTokenCallbackResult{}, fmt.Errorf("%w: unsupported oauth provider", sherrors.ErrInvalidInput)
+	}
+
+	profile, err := provider.ProfileFromToken(ctx, req.AccessToken)
+	if err != nil {
+		if errors.Is(err, sherrors.ErrUnauthorized) {
+			return domain.OAuthTokenCallbackResult{}, sherrors.ErrUnauthorized
+		}
+		if errors.Is(err, sherrors.ErrInvalidInput) {
+			return domain.OAuthTokenCallbackResult{}, sherrors.ErrInvalidInput
+		}
+		return domain.OAuthTokenCallbackResult{}, err
+	}
+
+	u, err := o.resolveUser(ctx, req.Provider, profile)
+	if err != nil {
+		return domain.OAuthTokenCallbackResult{}, err
+	}
+
+	pair, err := o.tokens.IssuePair(ctx, u.ID)
+	if err != nil {
+		return domain.OAuthTokenCallbackResult{}, err
+	}
+
+	return domain.OAuthTokenCallbackResult{
 		User:      u,
 		TokenPair: pair,
 	}, nil

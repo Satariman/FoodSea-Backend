@@ -8,9 +8,16 @@ import numpy as np
 def renormalize_weights_for_present_channels(
     weights: Dict[str, float], present_channels: Set[str]
 ) -> Dict[str, float]:
+    if not present_channels:
+        raise ValueError("present_channels must not be empty")
+
     filtered: Dict[str, float] = {}
     for channel in present_channels:
         weight = float(weights.get(channel, 0.0))
+        if not np.isfinite(weight):
+            raise ValueError(
+                f"Weight for channel '{channel}' must be finite, got {weight!r}"
+            )
         if weight > 0.0:
             filtered[channel] = weight
 
@@ -18,6 +25,10 @@ def renormalize_weights_for_present_channels(
         raise ValueError("No positive weights for present channels")
 
     total = sum(filtered.values())
+    if not np.isfinite(total) or total <= 0.0:
+        raise ValueError(
+            f"Sum of positive weights must be finite and > 0, got {total!r}"
+        )
     return {channel: weight / total for channel, weight in filtered.items()}
 
 
@@ -35,6 +46,8 @@ def weighted_fuse(
             raise ValueError(
                 f"Vector for channel '{channel}' must be 1D, got shape {arr.shape}"
             )
+        if not np.all(np.isfinite(arr)):
+            raise ValueError(f"Vector for channel '{channel}' contains NaN/Inf values")
         if expected_dim is None:
             expected_dim = arr.shape[0]
         elif arr.shape[0] != expected_dim:
@@ -54,6 +67,8 @@ def weighted_fuse(
         fused += vectors_1d[channel] * np.float32(weight)
 
     norm = float(np.linalg.norm(fused))
+    if not np.isfinite(norm):
+        raise ValueError("Fused vector norm is NaN/Inf and cannot be normalized")
     if norm <= 0.0:
         raise ValueError("Fused vector has zero norm and cannot be normalized")
     return fused / np.float32(norm)

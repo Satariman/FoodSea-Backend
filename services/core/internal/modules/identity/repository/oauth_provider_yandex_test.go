@@ -149,3 +149,33 @@ func TestYandexOAuthProvider_Exchange(t *testing.T) {
 		})
 	}
 }
+
+func TestYandexOAuthProvider_ProfileFromToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/userinfo" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if got := r.Header.Get("Authorization"); got != "OAuth sdk-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":            "yandex-sdk-1",
+			"default_email": "sdk@yandex.ru",
+		})
+	}))
+	defer srv.Close()
+
+	p := NewYandexOAuthProvider(config.OAuthProviderConfig{
+		UserInfoURL: srv.URL + "/userinfo",
+	}, srv.Client())
+
+	profile, err := p.ProfileFromToken(context.Background(), "sdk-token")
+	require.NoError(t, err)
+	assert.Equal(t, domain.OAuthProviderYandex, profile.Provider)
+	assert.Equal(t, "yandex-sdk-1", profile.ProviderUserID)
+	require.NotNil(t, profile.Email)
+	assert.Equal(t, "sdk@yandex.ru", *profile.Email)
+	assert.True(t, profile.EmailVerified)
+}
