@@ -34,6 +34,7 @@ class _IndexedProduct:
 
 class OCRProductTextParser:
     _LOW_CONFIDENCE_THRESHOLD = 0.55
+    _MIN_BRAND_OVERLAP_THRESHOLD = 0.5
 
     def __init__(self, products: Iterable[ProductTextMeta]) -> None:
         self._products = [self._index_product(product) for product in products]
@@ -66,11 +67,17 @@ class OCRProductTextParser:
 
         for brand, brand_tokens in seen.items():
             score = self._overlap_score(ocr_tokens, brand_tokens)
-            if score > best_score:
+            if score > best_score or (
+                score == best_score and best_brand is not None and brand < best_brand
+            ):
                 best_score = score
                 best_brand = brand
 
-        return best_brand if best_score > 0 else None
+        if best_brand is None:
+            return None
+        if best_score < self._MIN_BRAND_OVERLAP_THRESHOLD:
+            return None
+        return best_brand
 
     def _match_product(
         self, ocr_tokens: tuple[str, ...], brand: str | None
@@ -84,7 +91,11 @@ class OCRProductTextParser:
 
         for product in candidates:
             score = self._name_confidence(ocr_tokens, product.name_tokens)
-            if score > best_score:
+            if score > best_score or (
+                score == best_score
+                and best is not None
+                and self._product_tie_key(product) < self._product_tie_key(best)
+            ):
                 best_score = score
                 best = product
 
@@ -142,6 +153,14 @@ class OCRProductTextParser:
             ocr_tokens, candidate_tokens
         )
         return round((base_overlap * 0.4) + (important_overlap * 0.6), 3)
+
+    @staticmethod
+    def _product_tie_key(product: _IndexedProduct) -> tuple[str, str, str]:
+        return (
+            product.normalized_name,
+            product.normalized_brand,
+            product.meta.product_id,
+        )
 
     @staticmethod
     def _fallback_name_snippet(normalized_ocr: str, max_tokens: int = 6) -> str | None:
