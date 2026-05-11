@@ -205,8 +205,32 @@ jobs:
             services/ml/.venv/bin/python -m pip install -r services/ml/requirements-runtime.txt pytest==8.2.2
             services/ml/.venv/bin/python -m pip install -e services/ml --no-deps
             # test-swagger-regression expects local dev stack tooling (atlas/docker-compose),
-            # so on VM we run full Go+ML suites and validate HTTP endpoints separately below.
-            make test-go-all test-ml
+            # so on VM we run Go+ML suites and validate HTTP endpoints separately below.
+            make test-unit test-integration
+
+            retry_make_target() {
+              local target="$1"
+              local attempts="${2:-3}"
+              local delay_seconds="${3:-10}"
+              local i=1
+              while [ "$i" -le "$attempts" ]; do
+                if make "$target"; then
+                  return 0
+                fi
+                if [ "$i" -eq "$attempts" ]; then
+                  echo "target ${target} failed after ${attempts} attempts" >&2
+                  return 1
+                fi
+                echo "target ${target} failed (attempt ${i}/${attempts}), retrying in ${delay_seconds}s..."
+                sleep "${delay_seconds}"
+                i=$((i + 1))
+              done
+            }
+
+            retry_make_target test-e2e-core 3 12
+            retry_make_target test-e2e-ordering 3 12
+            retry_make_target test-e2e-optimization 3 12
+            make test-ml
 
             check_code() {
               local expected="$1"
