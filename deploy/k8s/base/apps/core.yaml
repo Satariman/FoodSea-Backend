@@ -14,6 +14,8 @@ data:
   S3_BUCKET_NAME: product-images
   S3_USE_SSL: "false"
   S3_PUBLIC_BASE_URL: http://foodsea.local/product-images
+  ML_SERVICE_VOICE_GRPC_ADDR: ml-service:50051
+  VOICE_REQUEST_TIMEOUT_MS: "5000"
 ---
 apiVersion: apps/v1
 kind: Deployment

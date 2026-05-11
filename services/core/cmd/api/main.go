@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	// Import generated docs (populated after swag init)
 	_ "github.com/foodsea/core/docs/swagger"
@@ -28,6 +31,7 @@ import (
 	"github.com/foodsea/core/internal/modules/images"
 	"github.com/foodsea/core/internal/modules/partners"
 	"github.com/foodsea/core/internal/modules/search"
+	"github.com/foodsea/core/internal/modules/voice"
 	"github.com/foodsea/core/internal/platform/cache"
 	"github.com/foodsea/core/internal/platform/config"
 	"github.com/foodsea/core/internal/platform/database"
@@ -82,6 +86,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	mlVoiceAddr := getenv("ML_SERVICE_VOICE_GRPC_ADDR", "ml-service:50051")
+	mlVoiceConn, err := grpc.NewClient(mlVoiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Error("failed to dial ml-service voice gRPC", "error", err, "addr", mlVoiceAddr)
+		os.Exit(1)
+	}
+	defer mlVoiceConn.Close()
+
 	// ── Modules ───────────────────────────────────────────────────────────────
 
 	identityModule := identity.NewModule(identity.Deps{
@@ -122,6 +134,10 @@ func main() {
 		S3Client:  s3Client,
 		Logger:    log,
 	})
+	voiceModule := voice.NewModule(voice.Deps{
+		MLVoiceConn:    mlVoiceConn,
+		RequestTimeout: envDurationMs("VOICE_REQUEST_TIMEOUT_MS", 5000),
+	})
 
 	// ── HTTP server ───────────────────────────────────────────────────────────
 
@@ -153,6 +169,7 @@ func main() {
 	searchModule.RegisterRoutes(public)
 	barcodeModule.RegisterRoutes(public)
 	cartModule.RegisterRoutes(protected)
+	voiceModule.RegisterRoutes(protected)
 	imagesModule.RegisterRoutes(admin)
 
 	httpServer := &http.Server{
@@ -217,4 +234,20 @@ func main() {
 		slog.Error("server error", "error", err)
 		os.Exit(1)
 	}
+}
+
+func getenv(name, fallback string) string {
+	if v, ok := os.LookupEnv(name); ok && v != "" {
+		return v
+	}
+	return fallback
+}
+
+func envDurationMs(name string, defaultMs int) time.Duration {
+	if v, ok := os.LookupEnv(name); ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			return time.Duration(n) * time.Millisecond
+		}
+	}
+	return time.Duration(defaultMs) * time.Millisecond
 }

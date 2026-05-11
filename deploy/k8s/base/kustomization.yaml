@@ -13,6 +13,7 @@ resources:
   - migrations/jobs.yaml
   - network/ingress.yaml
   - security/network-policies.yaml
+  - secrets/gemini-api-key.yaml
 
 generatorOptions:
   disableNameSuffixHash: true

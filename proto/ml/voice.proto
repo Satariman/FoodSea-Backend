@@ -1,0 +1,28 @@
+syntax = "proto3";
+package ml;
+option go_package = "github.com/foodsea/proto/ml";
+
+service VoiceService {
+    rpc ParseShoppingList(ParseShoppingListRequest) returns (ParseShoppingListResponse);
+}
+
+message ParseShoppingListRequest {
+    string text = 1;
+    string locale = 2;
+    int32 top_k_per_item = 3;
+}
+
+message ParseShoppingListResponse {
+    repeated VoiceItem items = 1;
+    repeated string unmatched_queries = 2;
+}
+
+message VoiceItem {
+    string product_id = 1;
+    string product_name = 2;
+    // Floored to integer; fractional Russian numerals (пол, полтора) are rounded down.
+    int32 quantity = 3;
+    string unit = 4;
+    double confidence = 5;
+    string raw_query = 6;
+}

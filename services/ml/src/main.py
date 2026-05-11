@@ -9,10 +9,15 @@ import grpc
 
 from src.config import Config
 from src.data_loader import DataLoader
+from src.embeddings.cache import EmbeddingCache
+from src.embeddings.gemini_client import GeminiClient
 from src.feature_builder import FeatureBuilder
 from src.index import AnalogIndex
-from src.service import AnalogServicer
-from src.proto import analogs_pb2_grpc
+from src.proto import analogs_pb2_grpc, voice_pb2_grpc
+from src.service import AnalogServicer, VoiceServicer
+from src.voice.matcher import VoiceMatcher
+from src.voice.pipeline import VoicePipeline
+from src.voice_index.index import VoiceIndex
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -63,12 +68,45 @@ def build_index(config: Config) -> AnalogIndex:
     return index
 
 
+def register_voice_servicer(server: grpc.Server, config: Config) -> None:
+    try:
+        voice_index = VoiceIndex.load(config.VOICE_INDEX_PATH)
+    except FileNotFoundError:
+        logger.warning(
+            "voice_index.pkl not found at %s; VoiceServicer NOT registered",
+            config.VOICE_INDEX_PATH,
+        )
+        return
+
+    gemini = GeminiClient(
+        api_key=config.GEMINI_API_KEY,
+        model=config.GEMINI_MODEL,
+        output_dim=config.GEMINI_OUTPUT_DIM,
+    )
+    matcher = VoiceMatcher(
+        index=voice_index,
+        gemini=gemini,
+        cache=EmbeddingCache(max_size=config.VOICE_EMBEDDING_CACHE_SIZE),
+        min_score=config.VOICE_MIN_NGRAM_SCORE,
+        max_ngram_len=config.VOICE_MAX_NGRAM_LEN,
+    )
+    voice_pipeline = VoicePipeline(matcher=matcher)
+    voice_pb2_grpc.add_VoiceServiceServicer_to_server(
+        VoiceServicer(pipeline=voice_pipeline), server,
+    )
+    logger.info(
+        "VoiceServicer registered with index of %d products",
+        len(voice_index.product_ids),
+    )
+
+
 def serve() -> None:
     config = Config()
     index = build_index(config)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     analogs_pb2_grpc.add_AnalogServiceServicer_to_server(AnalogServicer(index, config), server)
+    register_voice_servicer(server, config)
 
     addr = f"[::]:{config.GRPC_PORT}"
     server.add_insecure_port(addr)
