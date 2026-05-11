@@ -204,7 +204,9 @@ jobs:
             services/ml/.venv/bin/python -m pip install -U pip "setuptools>=68,<82" wheel
             services/ml/.venv/bin/python -m pip install -r services/ml/requirements-runtime.txt pytest==8.2.2
             services/ml/.venv/bin/python -m pip install -e services/ml --no-deps
-            make test-all
+            # test-swagger-regression expects local dev stack tooling (atlas/docker-compose),
+            # so on VM we run full Go+ML suites and validate HTTP endpoints separately below.
+            make test-go-all test-ml
 
             check_code() {
               local expected="$1"
