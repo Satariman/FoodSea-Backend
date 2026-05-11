@@ -40,14 +40,16 @@ spec:
             exec:
               command: ["pg_isready", "-U", "postgres"]
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests:
               cpu: 50m
-              memory: 64Mi
+              memory: 48Mi
             limits:
               cpu: 300m
-              memory: 256Mi
+              memory: 192Mi
   volumeClaimTemplates:
     - metadata:
         name: postgres-data
@@ -111,14 +113,16 @@ spec:
             exec:
               command: ["pg_isready", "-U", "postgres"]
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests:
               cpu: 50m
-              memory: 64Mi
+              memory: 48Mi
             limits:
               cpu: 300m
-              memory: 256Mi
+              memory: 192Mi
   volumeClaimTemplates:
     - metadata:
         name: postgres-data
@@ -182,14 +186,16 @@ spec:
             exec:
               command: ["pg_isready", "-U", "postgres"]
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests:
               cpu: 50m
-              memory: 64Mi
+              memory: 48Mi
             limits:
               cpu: 300m
-              memory: 256Mi
+              memory: 192Mi
   volumeClaimTemplates:
     - metadata:
         name: postgres-data

@@ -6,6 +6,9 @@ data:
   ENV: production
   SERVER_PORT: "8083"
   GRPC_PORT: "9093"
+  DB_MAX_OPEN_CONNS: "10"
+  DB_MAX_IDLE_CONNS: "3"
+  DB_CONN_MAX_LIFETIME: 5m
   REDIS_URL: redis://redis:6379/2
   KAFKA_BROKERS: kafka:9092
   CORE_GRPC_ADDR: core-service:9091
@@ -21,7 +24,7 @@ metadata:
     app.kubernetes.io/name: ordering-service
     app.kubernetes.io/component: api
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: ordering-service
@@ -46,6 +49,11 @@ spec:
                 name: ordering-config
             - secretRef:
                 name: ordering-secrets
+          env:
+            - name: GOMEMLIMIT
+              value: 160MiB
+            - name: GOGC
+              value: "80"
           livenessProbe:
             httpGet:
               path: /health
@@ -60,11 +68,11 @@ spec:
             periodSeconds: 10
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: 40m
+              memory: 48Mi
             limits:
               cpu: 300m
-              memory: 256Mi
+              memory: 192Mi
 ---
 apiVersion: v1
 kind: Service
@@ -93,8 +101,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: ordering-service
-  minReplicas: 2
-  maxReplicas: 5
+  minReplicas: 1
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource:

@@ -47,8 +47,11 @@ func (l *Login) Execute(ctx context.Context, creds domain.Credentials) (LoginRes
 	if err != nil {
 		return LoginResult{}, err
 	}
+	if hash == nil || *hash == "" {
+		return LoginResult{}, sherrors.ErrUnauthorized
+	}
 
-	if err := l.hasher.Verify(hash, creds.Password); err != nil {
+	if err := l.hasher.Verify(*hash, creds.Password); err != nil {
 		return LoginResult{}, sherrors.ErrUnauthorized
 	}
 

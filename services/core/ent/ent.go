@@ -17,6 +17,7 @@ import (
 	"github.com/foodsea/core/ent/cartitem"
 	"github.com/foodsea/core/ent/category"
 	"github.com/foodsea/core/ent/deliverycondition"
+	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
 	"github.com/foodsea/core/ent/product"
 	"github.com/foodsea/core/ent/productnutrition"
@@ -87,6 +88,7 @@ func checkColumn(t, c string) error {
 			cartitem.Table:          cartitem.ValidColumn,
 			category.Table:          category.ValidColumn,
 			deliverycondition.Table: deliverycondition.ValidColumn,
+			oauthidentity.Table:     oauthidentity.ValidColumn,
 			offer.Table:             offer.ValidColumn,
 			product.Table:           product.ValidColumn,
 			productnutrition.Table:  productnutrition.ValidColumn,

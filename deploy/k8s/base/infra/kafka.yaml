@@ -28,6 +28,8 @@ spec:
               value: "2181"
             - name: ZOOKEEPER_TICK_TIME
               value: "2000"
+            - name: ZOOKEEPER_HEAP_OPTS
+              value: "-Xms64m -Xmx128m"
           volumeMounts:
             - name: zookeeper-data
               mountPath: /var/lib/zookeeper/data
@@ -35,11 +37,11 @@ spec:
               mountPath: /var/lib/zookeeper/log
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: 25m
+              memory: 32Mi
             limits:
               cpu: 300m
-              memory: 256Mi
+              memory: 128Mi
   volumeClaimTemplates:
     - metadata:
         name: zookeeper-data
@@ -110,16 +112,18 @@ spec:
               value: "1"
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "false"
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms128m -Xmx192m"
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 50m
+              memory: 96Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 384Mi
   volumeClaimTemplates:
     - metadata:
         name: kafka-data
@@ -155,6 +159,13 @@ spec:
       containers:
         - name: kafka-init
           image: confluentinc/cp-kafka:7.5.0
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
           command: ["/bin/bash", "-ec"]
           args:
             - |

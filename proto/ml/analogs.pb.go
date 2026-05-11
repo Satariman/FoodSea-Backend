@@ -352,6 +352,186 @@ func (x *AnalogList) GetAnalogs() []*AnalogProto {
 	return nil
 }
 
+type SearchByPhotoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Image         []byte                 `protobuf:"bytes,1,opt,name=image,proto3" json:"image,omitempty"`
+	ImageMimeType string                 `protobuf:"bytes,2,opt,name=image_mime_type,json=imageMimeType,proto3" json:"image_mime_type,omitempty"`
+	OcrText       string                 `protobuf:"bytes,3,opt,name=ocr_text,json=ocrText,proto3" json:"ocr_text,omitempty"`
+	TopK          int32                  `protobuf:"varint,4,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchByPhotoRequest) Reset() {
+	*x = SearchByPhotoRequest{}
+	mi := &file_ml_analogs_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchByPhotoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchByPhotoRequest) ProtoMessage() {}
+
+func (x *SearchByPhotoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ml_analogs_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchByPhotoRequest.ProtoReflect.Descriptor instead.
+func (*SearchByPhotoRequest) Descriptor() ([]byte, []int) {
+	return file_ml_analogs_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SearchByPhotoRequest) GetImage() []byte {
+	if x != nil {
+		return x.Image
+	}
+	return nil
+}
+
+func (x *SearchByPhotoRequest) GetImageMimeType() string {
+	if x != nil {
+		return x.ImageMimeType
+	}
+	return ""
+}
+
+func (x *SearchByPhotoRequest) GetOcrText() string {
+	if x != nil {
+		return x.OcrText
+	}
+	return ""
+}
+
+func (x *SearchByPhotoRequest) GetTopK() int32 {
+	if x != nil {
+		return x.TopK
+	}
+	return 0
+}
+
+type SearchByPhotoResponse struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	MatchedName   string                  `protobuf:"bytes,1,opt,name=matched_name,json=matchedName,proto3" json:"matched_name,omitempty"`
+	MatchedBrand  string                  `protobuf:"bytes,2,opt,name=matched_brand,json=matchedBrand,proto3" json:"matched_brand,omitempty"`
+	Candidates    []*PhotoSearchCandidate `protobuf:"bytes,3,rep,name=candidates,proto3" json:"candidates,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchByPhotoResponse) Reset() {
+	*x = SearchByPhotoResponse{}
+	mi := &file_ml_analogs_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchByPhotoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchByPhotoResponse) ProtoMessage() {}
+
+func (x *SearchByPhotoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ml_analogs_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchByPhotoResponse.ProtoReflect.Descriptor instead.
+func (*SearchByPhotoResponse) Descriptor() ([]byte, []int) {
+	return file_ml_analogs_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SearchByPhotoResponse) GetMatchedName() string {
+	if x != nil {
+		return x.MatchedName
+	}
+	return ""
+}
+
+func (x *SearchByPhotoResponse) GetMatchedBrand() string {
+	if x != nil {
+		return x.MatchedBrand
+	}
+	return ""
+}
+
+func (x *SearchByPhotoResponse) GetCandidates() []*PhotoSearchCandidate {
+	if x != nil {
+		return x.Candidates
+	}
+	return nil
+}
+
+type PhotoSearchCandidate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Score         float64                `protobuf:"fixed64,2,opt,name=score,proto3" json:"score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PhotoSearchCandidate) Reset() {
+	*x = PhotoSearchCandidate{}
+	mi := &file_ml_analogs_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PhotoSearchCandidate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PhotoSearchCandidate) ProtoMessage() {}
+
+func (x *PhotoSearchCandidate) ProtoReflect() protoreflect.Message {
+	mi := &file_ml_analogs_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PhotoSearchCandidate.ProtoReflect.Descriptor instead.
+func (*PhotoSearchCandidate) Descriptor() ([]byte, []int) {
+	return file_ml_analogs_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *PhotoSearchCandidate) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *PhotoSearchCandidate) GetScore() float64 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
 var File_ml_analogs_proto protoreflect.FileDescriptor
 
 const file_ml_analogs_proto_rawDesc = "" +
@@ -384,11 +564,27 @@ const file_ml_analogs_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x0e.ml.AnalogListR\x05value:\x028\x01\"7\n" +
 	"\n" +
 	"AnalogList\x12)\n" +
-	"\aanalogs\x18\x01 \x03(\v2\x0f.ml.AnalogProtoR\aanalogs2\x98\x01\n" +
+	"\aanalogs\x18\x01 \x03(\v2\x0f.ml.AnalogProtoR\aanalogs\"\x84\x01\n" +
+	"\x14SearchByPhotoRequest\x12\x14\n" +
+	"\x05image\x18\x01 \x01(\fR\x05image\x12&\n" +
+	"\x0fimage_mime_type\x18\x02 \x01(\tR\rimageMimeType\x12\x19\n" +
+	"\bocr_text\x18\x03 \x01(\tR\aocrText\x12\x13\n" +
+	"\x05top_k\x18\x04 \x01(\x05R\x04topK\"\x99\x01\n" +
+	"\x15SearchByPhotoResponse\x12!\n" +
+	"\fmatched_name\x18\x01 \x01(\tR\vmatchedName\x12#\n" +
+	"\rmatched_brand\x18\x02 \x01(\tR\fmatchedBrand\x128\n" +
+	"\n" +
+	"candidates\x18\x03 \x03(\v2\x18.ml.PhotoSearchCandidateR\n" +
+	"candidates\"K\n" +
+	"\x14PhotoSearchCandidate\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tR\tproductId\x12\x14\n" +
+	"\x05score\x18\x02 \x01(\x01R\x05score2\xde\x01\n" +
 	"\rAnalogService\x12;\n" +
 	"\n" +
 	"GetAnalogs\x12\x15.ml.GetAnalogsRequest\x1a\x16.ml.GetAnalogsResponse\x12J\n" +
-	"\x0fGetBatchAnalogs\x12\x1a.ml.GetBatchAnalogsRequest\x1a\x1b.ml.GetBatchAnalogsResponseB\x1dZ\x1bgithub.com/foodsea/proto/mlb\x06proto3"
+	"\x0fGetBatchAnalogs\x12\x1a.ml.GetBatchAnalogsRequest\x1a\x1b.ml.GetBatchAnalogsResponse\x12D\n" +
+	"\rSearchByPhoto\x12\x18.ml.SearchByPhotoRequest\x1a\x19.ml.SearchByPhotoResponseB\x1dZ\x1bgithub.com/foodsea/proto/mlb\x06proto3"
 
 var (
 	file_ml_analogs_proto_rawDescOnce sync.Once
@@ -402,7 +598,7 @@ func file_ml_analogs_proto_rawDescGZIP() []byte {
 	return file_ml_analogs_proto_rawDescData
 }
 
-var file_ml_analogs_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_ml_analogs_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_ml_analogs_proto_goTypes = []any{
 	(*GetAnalogsRequest)(nil),       // 0: ml.GetAnalogsRequest
 	(*GetAnalogsResponse)(nil),      // 1: ml.GetAnalogsResponse
@@ -410,22 +606,28 @@ var file_ml_analogs_proto_goTypes = []any{
 	(*GetBatchAnalogsRequest)(nil),  // 3: ml.GetBatchAnalogsRequest
 	(*GetBatchAnalogsResponse)(nil), // 4: ml.GetBatchAnalogsResponse
 	(*AnalogList)(nil),              // 5: ml.AnalogList
-	nil,                             // 6: ml.GetBatchAnalogsResponse.AnalogsByProductEntry
+	(*SearchByPhotoRequest)(nil),    // 6: ml.SearchByPhotoRequest
+	(*SearchByPhotoResponse)(nil),   // 7: ml.SearchByPhotoResponse
+	(*PhotoSearchCandidate)(nil),    // 8: ml.PhotoSearchCandidate
+	nil,                             // 9: ml.GetBatchAnalogsResponse.AnalogsByProductEntry
 }
 var file_ml_analogs_proto_depIdxs = []int32{
 	2, // 0: ml.GetAnalogsResponse.analogs:type_name -> ml.AnalogProto
-	6, // 1: ml.GetBatchAnalogsResponse.analogs_by_product:type_name -> ml.GetBatchAnalogsResponse.AnalogsByProductEntry
+	9, // 1: ml.GetBatchAnalogsResponse.analogs_by_product:type_name -> ml.GetBatchAnalogsResponse.AnalogsByProductEntry
 	2, // 2: ml.AnalogList.analogs:type_name -> ml.AnalogProto
-	5, // 3: ml.GetBatchAnalogsResponse.AnalogsByProductEntry.value:type_name -> ml.AnalogList
-	0, // 4: ml.AnalogService.GetAnalogs:input_type -> ml.GetAnalogsRequest
-	3, // 5: ml.AnalogService.GetBatchAnalogs:input_type -> ml.GetBatchAnalogsRequest
-	1, // 6: ml.AnalogService.GetAnalogs:output_type -> ml.GetAnalogsResponse
-	4, // 7: ml.AnalogService.GetBatchAnalogs:output_type -> ml.GetBatchAnalogsResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	8, // 3: ml.SearchByPhotoResponse.candidates:type_name -> ml.PhotoSearchCandidate
+	5, // 4: ml.GetBatchAnalogsResponse.AnalogsByProductEntry.value:type_name -> ml.AnalogList
+	0, // 5: ml.AnalogService.GetAnalogs:input_type -> ml.GetAnalogsRequest
+	3, // 6: ml.AnalogService.GetBatchAnalogs:input_type -> ml.GetBatchAnalogsRequest
+	6, // 7: ml.AnalogService.SearchByPhoto:input_type -> ml.SearchByPhotoRequest
+	1, // 8: ml.AnalogService.GetAnalogs:output_type -> ml.GetAnalogsResponse
+	4, // 9: ml.AnalogService.GetBatchAnalogs:output_type -> ml.GetBatchAnalogsResponse
+	7, // 10: ml.AnalogService.SearchByPhoto:output_type -> ml.SearchByPhotoResponse
+	8, // [8:11] is the sub-list for method output_type
+	5, // [5:8] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_ml_analogs_proto_init() }
@@ -439,7 +641,7 @@ func file_ml_analogs_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ml_analogs_proto_rawDesc), len(file_ml_analogs_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

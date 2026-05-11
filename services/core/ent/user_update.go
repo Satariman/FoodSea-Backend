@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/foodsea/core/ent/cart"
+	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/predicate"
 	"github.com/foodsea/core/ent/user"
 	"github.com/google/uuid"
@@ -90,6 +91,12 @@ func (_u *UserUpdate) SetNillablePasswordHash(v *string) *UserUpdate {
 	return _u
 }
 
+// ClearPasswordHash clears the value of the "password_hash" field.
+func (_u *UserUpdate) ClearPasswordHash() *UserUpdate {
+	_u.mutation.ClearPasswordHash()
+	return _u
+}
+
 // SetOnboardingDone sets the "onboarding_done" field.
 func (_u *UserUpdate) SetOnboardingDone(v bool) *UserUpdate {
 	_u.mutation.SetOnboardingDone(v)
@@ -123,6 +130,21 @@ func (_u *UserUpdate) SetCart(v *Cart) *UserUpdate {
 	return _u.SetCartID(v.ID)
 }
 
+// AddOauthIdentityIDs adds the "oauth_identities" edge to the OAuthIdentity entity by IDs.
+func (_u *UserUpdate) AddOauthIdentityIDs(ids ...uuid.UUID) *UserUpdate {
+	_u.mutation.AddOauthIdentityIDs(ids...)
+	return _u
+}
+
+// AddOauthIdentities adds the "oauth_identities" edges to the OAuthIdentity entity.
+func (_u *UserUpdate) AddOauthIdentities(v ...*OAuthIdentity) *UserUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOauthIdentityIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdate) Mutation() *UserMutation {
 	return _u.mutation
@@ -132,6 +154,27 @@ func (_u *UserUpdate) Mutation() *UserMutation {
 func (_u *UserUpdate) ClearCart() *UserUpdate {
 	_u.mutation.ClearCart()
 	return _u
+}
+
+// ClearOauthIdentities clears all "oauth_identities" edges to the OAuthIdentity entity.
+func (_u *UserUpdate) ClearOauthIdentities() *UserUpdate {
+	_u.mutation.ClearOauthIdentities()
+	return _u
+}
+
+// RemoveOauthIdentityIDs removes the "oauth_identities" edge to OAuthIdentity entities by IDs.
+func (_u *UserUpdate) RemoveOauthIdentityIDs(ids ...uuid.UUID) *UserUpdate {
+	_u.mutation.RemoveOauthIdentityIDs(ids...)
+	return _u
+}
+
+// RemoveOauthIdentities removes "oauth_identities" edges to OAuthIdentity entities.
+func (_u *UserUpdate) RemoveOauthIdentities(v ...*OAuthIdentity) *UserUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOauthIdentityIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -176,20 +219,7 @@ func (_u *UserUpdate) defaults() error {
 	return nil
 }
 
-// check runs all checks and user-defined validators on the builder.
-func (_u *UserUpdate) check() error {
-	if v, ok := _u.mutation.PasswordHash(); ok {
-		if err := user.PasswordHashValidator(v); err != nil {
-			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "User.password_hash": %w`, err)}
-		}
-	}
-	return nil
-}
-
 func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
-	if err := _u.check(); err != nil {
-		return _node, err
-	}
 	_spec := sqlgraph.NewUpdateSpec(user.Table, user.Columns, sqlgraph.NewFieldSpec(user.FieldID, field.TypeUUID))
 	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
@@ -216,6 +246,9 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.PasswordHash(); ok {
 		_spec.SetField(user.FieldPasswordHash, field.TypeString, value)
 	}
+	if _u.mutation.PasswordHashCleared() {
+		_spec.ClearField(user.FieldPasswordHash, field.TypeString)
+	}
 	if value, ok := _u.mutation.OnboardingDone(); ok {
 		_spec.SetField(user.FieldOnboardingDone, field.TypeBool, value)
 	}
@@ -241,6 +274,51 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(cart.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OauthIdentitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(oauthidentity.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOauthIdentitiesIDs(); len(nodes) > 0 && !_u.mutation.OauthIdentitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(oauthidentity.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OauthIdentitiesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(oauthidentity.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -328,6 +406,12 @@ func (_u *UserUpdateOne) SetNillablePasswordHash(v *string) *UserUpdateOne {
 	return _u
 }
 
+// ClearPasswordHash clears the value of the "password_hash" field.
+func (_u *UserUpdateOne) ClearPasswordHash() *UserUpdateOne {
+	_u.mutation.ClearPasswordHash()
+	return _u
+}
+
 // SetOnboardingDone sets the "onboarding_done" field.
 func (_u *UserUpdateOne) SetOnboardingDone(v bool) *UserUpdateOne {
 	_u.mutation.SetOnboardingDone(v)
@@ -361,6 +445,21 @@ func (_u *UserUpdateOne) SetCart(v *Cart) *UserUpdateOne {
 	return _u.SetCartID(v.ID)
 }
 
+// AddOauthIdentityIDs adds the "oauth_identities" edge to the OAuthIdentity entity by IDs.
+func (_u *UserUpdateOne) AddOauthIdentityIDs(ids ...uuid.UUID) *UserUpdateOne {
+	_u.mutation.AddOauthIdentityIDs(ids...)
+	return _u
+}
+
+// AddOauthIdentities adds the "oauth_identities" edges to the OAuthIdentity entity.
+func (_u *UserUpdateOne) AddOauthIdentities(v ...*OAuthIdentity) *UserUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOauthIdentityIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdateOne) Mutation() *UserMutation {
 	return _u.mutation
@@ -370,6 +469,27 @@ func (_u *UserUpdateOne) Mutation() *UserMutation {
 func (_u *UserUpdateOne) ClearCart() *UserUpdateOne {
 	_u.mutation.ClearCart()
 	return _u
+}
+
+// ClearOauthIdentities clears all "oauth_identities" edges to the OAuthIdentity entity.
+func (_u *UserUpdateOne) ClearOauthIdentities() *UserUpdateOne {
+	_u.mutation.ClearOauthIdentities()
+	return _u
+}
+
+// RemoveOauthIdentityIDs removes the "oauth_identities" edge to OAuthIdentity entities by IDs.
+func (_u *UserUpdateOne) RemoveOauthIdentityIDs(ids ...uuid.UUID) *UserUpdateOne {
+	_u.mutation.RemoveOauthIdentityIDs(ids...)
+	return _u
+}
+
+// RemoveOauthIdentities removes "oauth_identities" edges to OAuthIdentity entities.
+func (_u *UserUpdateOne) RemoveOauthIdentities(v ...*OAuthIdentity) *UserUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOauthIdentityIDs(ids...)
 }
 
 // Where appends a list predicates to the UserUpdate builder.
@@ -427,20 +547,7 @@ func (_u *UserUpdateOne) defaults() error {
 	return nil
 }
 
-// check runs all checks and user-defined validators on the builder.
-func (_u *UserUpdateOne) check() error {
-	if v, ok := _u.mutation.PasswordHash(); ok {
-		if err := user.PasswordHashValidator(v); err != nil {
-			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "User.password_hash": %w`, err)}
-		}
-	}
-	return nil
-}
-
 func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
-	if err := _u.check(); err != nil {
-		return _node, err
-	}
 	_spec := sqlgraph.NewUpdateSpec(user.Table, user.Columns, sqlgraph.NewFieldSpec(user.FieldID, field.TypeUUID))
 	id, ok := _u.mutation.ID()
 	if !ok {
@@ -484,6 +591,9 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	if value, ok := _u.mutation.PasswordHash(); ok {
 		_spec.SetField(user.FieldPasswordHash, field.TypeString, value)
 	}
+	if _u.mutation.PasswordHashCleared() {
+		_spec.ClearField(user.FieldPasswordHash, field.TypeString)
+	}
 	if value, ok := _u.mutation.OnboardingDone(); ok {
 		_spec.SetField(user.FieldOnboardingDone, field.TypeBool, value)
 	}
@@ -509,6 +619,51 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(cart.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OauthIdentitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(oauthidentity.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOauthIdentitiesIDs(); len(nodes) > 0 && !_u.mutation.OauthIdentitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(oauthidentity.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OauthIdentitiesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.OauthIdentitiesTable,
+			Columns: []string{user.OauthIdentitiesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(oauthidentity.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

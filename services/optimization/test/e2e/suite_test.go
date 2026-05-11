@@ -178,6 +178,10 @@ func run(ctx context.Context, m *testing.M) int {
 		tcpostgres.WithDatabase("optimization_db"),
 		tcpostgres.WithUsername("postgres"),
 		tcpostgres.WithPassword("postgres"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2),
+		),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "start postgres: %v\n", err)

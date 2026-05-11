@@ -29,11 +29,22 @@ type logoutUseCase interface {
 	Execute(ctx context.Context, userID uuid.UUID) error
 }
 
+type oauthStartUseCase interface {
+	Execute(ctx context.Context, req domain.OAuthStartRequest) (domain.OAuthStartResult, error)
+}
+
+type oauthCallbackUseCase interface {
+	Execute(ctx context.Context, req domain.OAuthCallbackRequest) (domain.OAuthCallbackResult, error)
+	ExecuteToken(ctx context.Context, req domain.OAuthTokenCallbackRequest) (domain.OAuthTokenCallbackResult, error)
+}
+
 type AuthHandler struct {
-	register registerUseCase
-	login    loginUseCase
-	refresh  refreshUseCase
-	logout   logoutUseCase
+	register      registerUseCase
+	login         loginUseCase
+	refresh       refreshUseCase
+	logout        logoutUseCase
+	oauthStart    oauthStartUseCase
+	oauthCallback oauthCallbackUseCase
 }
 
 func NewAuthHandler(
@@ -41,12 +52,16 @@ func NewAuthHandler(
 	login loginUseCase,
 	refresh refreshUseCase,
 	logout logoutUseCase,
+	oauthStart oauthStartUseCase,
+	oauthCallback oauthCallbackUseCase,
 ) *AuthHandler {
 	return &AuthHandler{
-		register: register,
-		login:    login,
-		refresh:  refresh,
-		logout:   logout,
+		register:      register,
+		login:         login,
+		refresh:       refresh,
+		logout:        logout,
+		oauthStart:    oauthStart,
+		oauthCallback: oauthCallback,
 	}
 }
 
@@ -165,4 +180,197 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	httputil.NoContent(c)
+}
+
+// OAuthStart godoc
+// @Summary      Start OAuth flow
+// @Description  Builds provider auth URL and creates a state token
+// @Tags         auth
+// @Produce      json
+// @Param        provider path string true "OAuth provider"
+// @Param        redirect_uri query string true "Redirect URI"
+// @Success      200 {object} httputil.Response{data=OAuthStartResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/{provider}/start [get]
+func (h *AuthHandler) OAuthStart(c *gin.Context) {
+	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	redirectURI := c.Query("redirect_uri")
+	result, err := h.oauthStart.Execute(c.Request.Context(), domain.OAuthStartRequest{
+		Provider:   provider,
+		RedirectTo: redirectURI,
+		Mode:       domain.OAuthFlowModeLegacy,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, OAuthStartResponse{
+		AuthURL: result.AuthURL,
+		State:   result.State,
+	})
+}
+
+// OAuthNativeStart godoc
+// @Summary      Start native OAuth flow
+// @Description  Builds provider auth URL and creates a native state token
+// @Tags         auth
+// @Produce      json
+// @Param        provider path string true "OAuth provider"
+// @Param        redirect_uri query string true "Native redirect URI"
+// @Success      200 {object} httputil.Response{data=OAuthStartResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/native/{provider}/start [get]
+func (h *AuthHandler) OAuthNativeStart(c *gin.Context) {
+	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	redirectURI := c.Query("redirect_uri")
+	result, err := h.oauthStart.Execute(c.Request.Context(), domain.OAuthStartRequest{
+		Provider:   provider,
+		RedirectTo: redirectURI,
+		Mode:       domain.OAuthFlowModeNative,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, OAuthStartResponse{
+		AuthURL: result.AuthURL,
+		State:   result.State,
+	})
+}
+
+// OAuthCallback godoc
+// @Summary      Finish OAuth flow
+// @Description  Exchanges OAuth code and returns auth tokens
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        provider path string true "OAuth provider"
+// @Param        body body OAuthCallbackRequest true "OAuth callback payload"
+// @Success      200 {object} httputil.Response{data=AuthResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      401 {object} httputil.Response
+// @Failure      409 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/{provider}/callback [post]
+func (h *AuthHandler) OAuthCallback(c *gin.Context) {
+	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	var req OAuthCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httputil.BadRequest(c, err.Error())
+		return
+	}
+
+	result, err := h.oauthCallback.Execute(c.Request.Context(), domain.OAuthCallbackRequest{
+		Provider:    provider,
+		State:       req.State,
+		Code:        req.Code,
+		RedirectURI: req.RedirectURI,
+		Mode:        domain.OAuthFlowModeLegacy,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, toAuthResponse(result.User, result.TokenPair))
+}
+
+// OAuthNativeCallback godoc
+// @Summary      Finish native OAuth flow
+// @Description  Exchanges OAuth code from native client and returns auth tokens
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        provider path string true "OAuth provider"
+// @Param        body body OAuthCallbackRequest true "OAuth callback payload"
+// @Success      200 {object} httputil.Response{data=AuthResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      401 {object} httputil.Response
+// @Failure      409 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/native/{provider}/callback [post]
+func (h *AuthHandler) OAuthNativeCallback(c *gin.Context) {
+	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	var req OAuthCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httputil.BadRequest(c, err.Error())
+		return
+	}
+
+	result, err := h.oauthCallback.Execute(c.Request.Context(), domain.OAuthCallbackRequest{
+		Provider:    provider,
+		State:       req.State,
+		Code:        req.Code,
+		RedirectURI: req.RedirectURI,
+		Mode:        domain.OAuthFlowModeNative,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, toAuthResponse(result.User, result.TokenPair))
+}
+
+// OAuthNativeSDKCallback godoc
+// @Summary      Finish native OAuth SDK flow
+// @Description  Accepts provider access token from mobile SDK and returns FoodSea auth tokens
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        provider path string true "OAuth provider"
+// @Param        body body OAuthNativeSDKCallbackRequest true "OAuth SDK callback payload"
+// @Success      200 {object} httputil.Response{data=AuthResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      401 {object} httputil.Response
+// @Failure      409 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/native/{provider}/sdk/callback [post]
+func (h *AuthHandler) OAuthNativeSDKCallback(c *gin.Context) {
+	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	var req OAuthNativeSDKCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httputil.BadRequest(c, err.Error())
+		return
+	}
+
+	result, err := h.oauthCallback.ExecuteToken(c.Request.Context(), domain.OAuthTokenCallbackRequest{
+		Provider:    provider,
+		AccessToken: req.AccessToken,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, toAuthResponse(result.User, result.TokenPair))
 }

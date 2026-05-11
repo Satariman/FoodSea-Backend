@@ -34,14 +34,18 @@ func (s *CatalogServer) ListProductsForML(ctx context.Context, _ *pb.ListProduct
 	result := make([]*pb.ProductFeaturesProto, 0, len(products))
 	for _, p := range products {
 		protoProduct := &pb.ProductFeaturesProto{
-			ProductId:     p.ID.String(),
-			Name:          p.Name,
-			Description:   strOrEmpty(p.Description),
-			Composition:   strOrEmpty(p.Composition),
-			CategoryId:    p.CategoryID.String(),
-			SubcategoryId: uuidPtrToString(p.SubcategoryID),
-			BrandId:       uuidPtrToString(p.BrandID),
-			Weight:        strOrEmpty(p.Weight),
+			ProductId:       p.ID.String(),
+			Name:            p.Name,
+			Description:     strOrEmpty(p.Description),
+			Composition:     strOrEmpty(p.Composition),
+			CategoryId:      p.CategoryID.String(),
+			SubcategoryId:   uuidPtrToString(p.SubcategoryID),
+			BrandId:         uuidPtrToString(p.BrandID),
+			BrandName:       p.BrandName,
+			CategoryName:    p.CategoryName,
+			SubcategoryName: p.SubcategoryName,
+			ImageUrl:        strOrEmpty(p.ImageURL),
+			Weight:          strOrEmpty(p.Weight),
 		}
 
 		if p.Nutrition != nil {

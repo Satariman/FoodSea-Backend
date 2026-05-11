@@ -48,6 +48,7 @@ func TestCatalogServer_ListProductsForML_MapsDomainToProto(t *testing.T) {
 	description := "desc"
 	composition := "comp"
 	weight := "500 мл"
+	imageURL := "https://cdn.example/milk.png"
 	subcategoryID := uuid.New()
 	brandID := uuid.New()
 	storeID := uuid.New()
@@ -55,14 +56,18 @@ func TestCatalogServer_ListProductsForML_MapsDomainToProto(t *testing.T) {
 	repo := &stubProductRepo{
 		products: []domain.ProductMLData{
 			{
-				ID:            uuid.New(),
-				Name:          "Milk",
-				Description:   &description,
-				Composition:   &composition,
-				CategoryID:    uuid.New(),
-				SubcategoryID: &subcategoryID,
-				BrandID:       &brandID,
-				Weight:        &weight,
+				ID:              uuid.New(),
+				Name:            "Milk",
+				Description:     &description,
+				Composition:     &composition,
+				CategoryID:      uuid.New(),
+				CategoryName:    "Dairy",
+				SubcategoryID:   &subcategoryID,
+				SubcategoryName: "Milk",
+				BrandID:         &brandID,
+				BrandName:       "Prostokvashino",
+				Weight:          &weight,
+				ImageURL:        &imageURL,
 				Nutrition: &domain.Nutrition{
 					Calories:      52.5,
 					Protein:       3.2,
@@ -91,6 +96,10 @@ func TestCatalogServer_ListProductsForML_MapsDomainToProto(t *testing.T) {
 	assert.Equal(t, "500 мл", p.Weight)
 	assert.Equal(t, subcategoryID.String(), p.SubcategoryId)
 	assert.Equal(t, brandID.String(), p.BrandId)
+	assert.Equal(t, "Dairy", p.CategoryName)
+	assert.Equal(t, "Milk", p.SubcategoryName)
+	assert.Equal(t, "Prostokvashino", p.BrandName)
+	assert.Equal(t, "https://cdn.example/milk.png", p.ImageUrl)
 	require.Len(t, p.Offers, 1)
 	assert.Equal(t, storeID.String(), p.Offers[0].StoreId)
 	assert.Equal(t, int64(10990), p.Offers[0].PriceKopecks)

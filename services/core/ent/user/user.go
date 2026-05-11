@@ -30,6 +30,8 @@ const (
 	FieldOnboardingDone = "onboarding_done"
 	// EdgeCart holds the string denoting the cart edge name in mutations.
 	EdgeCart = "cart"
+	// EdgeOauthIdentities holds the string denoting the oauth_identities edge name in mutations.
+	EdgeOauthIdentities = "oauth_identities"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// CartTable is the table that holds the cart relation/edge.
@@ -39,6 +41,13 @@ const (
 	CartInverseTable = "carts"
 	// CartColumn is the table column denoting the cart relation/edge.
 	CartColumn = "user_id"
+	// OauthIdentitiesTable is the table that holds the oauth_identities relation/edge.
+	OauthIdentitiesTable = "oauth_identities"
+	// OauthIdentitiesInverseTable is the table name for the OAuthIdentity entity.
+	// It exists in this package in order to avoid circular dependency with the "oauthidentity" package.
+	OauthIdentitiesInverseTable = "oauth_identities"
+	// OauthIdentitiesColumn is the table column denoting the oauth_identities relation/edge.
+	OauthIdentitiesColumn = "user_id"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -75,8 +84,6 @@ var (
 	DefaultUpdatedAt func() time.Time
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
-	// PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
-	PasswordHashValidator func(string) error
 	// DefaultOnboardingDone holds the default value on creation for the "onboarding_done" field.
 	DefaultOnboardingDone bool
 	// DefaultID holds the default value on creation for the "id" field.
@@ -127,10 +134,31 @@ func ByCartField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newCartStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByOauthIdentitiesCount orders the results by oauth_identities count.
+func ByOauthIdentitiesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOauthIdentitiesStep(), opts...)
+	}
+}
+
+// ByOauthIdentities orders the results by oauth_identities terms.
+func ByOauthIdentities(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOauthIdentitiesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newCartStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(CartInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2O, false, CartTable, CartColumn),
+	)
+}
+func newOauthIdentitiesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OauthIdentitiesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OauthIdentitiesTable, OauthIdentitiesColumn),
 	)
 }

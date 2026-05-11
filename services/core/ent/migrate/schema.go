@@ -135,6 +135,42 @@ var (
 			},
 		},
 	}
+	// OauthIdentitiesColumns holds the columns for the "oauth_identities" table.
+	OauthIdentitiesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "provider_user_id", Type: field.TypeString},
+		{Name: "email", Type: field.TypeString, Nullable: true},
+		{Name: "user_id", Type: field.TypeUUID},
+	}
+	// OauthIdentitiesTable holds the schema information for the "oauth_identities" table.
+	OauthIdentitiesTable = &schema.Table{
+		Name:       "oauth_identities",
+		Columns:    OauthIdentitiesColumns,
+		PrimaryKey: []*schema.Column{OauthIdentitiesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "oauth_identities_users_oauth_identities",
+				Columns:    []*schema.Column{OauthIdentitiesColumns[6]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "oauthidentity_provider_provider_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{OauthIdentitiesColumns[3], OauthIdentitiesColumns[4]},
+			},
+			{
+				Name:    "oauthidentity_provider_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{OauthIdentitiesColumns[3], OauthIdentitiesColumns[6]},
+			},
+		},
+	}
 	// OffersColumns holds the columns for the "offers" table.
 	OffersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -317,7 +353,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "phone", Type: field.TypeString, Unique: true, Nullable: true},
 		{Name: "email", Type: field.TypeString, Unique: true, Nullable: true},
-		{Name: "password_hash", Type: field.TypeString},
+		{Name: "password_hash", Type: field.TypeString, Nullable: true},
 		{Name: "onboarding_done", Type: field.TypeBool, Default: false},
 	}
 	// UsersTable holds the schema information for the "users" table.
@@ -333,6 +369,7 @@ var (
 		CartItemsTable,
 		CategoriesTable,
 		DeliveryConditionsTable,
+		OauthIdentitiesTable,
 		OffersTable,
 		ProductsTable,
 		ProductNutritionsTable,
@@ -347,6 +384,7 @@ func init() {
 	CartItemsTable.ForeignKeys[1].RefTable = ProductsTable
 	CategoriesTable.ForeignKeys[0].RefTable = CategoriesTable
 	DeliveryConditionsTable.ForeignKeys[0].RefTable = StoresTable
+	OauthIdentitiesTable.ForeignKeys[0].RefTable = UsersTable
 	OffersTable.ForeignKeys[0].RefTable = ProductsTable
 	OffersTable.ForeignKeys[1].RefTable = StoresTable
 	ProductsTable.ForeignKeys[0].RefTable = BrandsTable

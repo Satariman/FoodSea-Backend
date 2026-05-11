@@ -30,11 +30,13 @@ import (
 	"github.com/foodsea/core/internal/modules/identity"
 	"github.com/foodsea/core/internal/modules/images"
 	"github.com/foodsea/core/internal/modules/partners"
+	"github.com/foodsea/core/internal/modules/photo_search"
 	"github.com/foodsea/core/internal/modules/search"
 	"github.com/foodsea/core/internal/modules/voice"
 	"github.com/foodsea/core/internal/platform/cache"
 	"github.com/foodsea/core/internal/platform/config"
 	"github.com/foodsea/core/internal/platform/database"
+	"github.com/foodsea/core/internal/platform/grpcclient"
 	"github.com/foodsea/core/internal/platform/grpcserver"
 	"github.com/foodsea/core/internal/platform/kafka"
 	"github.com/foodsea/core/internal/platform/logger"
@@ -94,6 +96,17 @@ func main() {
 	}
 	defer mlVoiceConn.Close()
 
+	mlClients, err := grpcclient.DialML(ctx, cfg.ML.GRPCAddr, log)
+	if err != nil {
+		log.Error("failed to initialise ML gRPC clients", "error", err, "addr", cfg.ML.GRPCAddr)
+		os.Exit(1)
+	}
+	defer func() {
+		if closeErr := mlClients.Close(); closeErr != nil {
+			log.Warn("failed to close ML gRPC clients", "error", closeErr)
+		}
+	}()
+
 	// ── Modules ───────────────────────────────────────────────────────────────
 
 	identityModule := identity.NewModule(identity.Deps{
@@ -102,6 +115,7 @@ func main() {
 		Cache: redisCache,
 		Log:   log,
 		JWT:   cfg.JWT,
+		OAuth: cfg.OAuth,
 	})
 	partnersModule := partners.NewModule(partners.Deps{
 		Ent:   entClient,
@@ -138,6 +152,12 @@ func main() {
 		MLVoiceConn:    mlVoiceConn,
 		RequestTimeout: envDurationMs("VOICE_REQUEST_TIMEOUT_MS", 5000),
 	})
+	photoSearchModule := photo_search.NewModule(photo_search.Deps{
+		MLClient:      mlClients.Analog,
+		ProductLoader: catalogModule.ProductLoader(),
+		MaxImageBytes: cfg.PhotoSearch.MaxImageBytes,
+		Timeout:       cfg.PhotoSearch.Timeout,
+	})
 
 	// ── HTTP server ───────────────────────────────────────────────────────────
 
@@ -170,6 +190,7 @@ func main() {
 	barcodeModule.RegisterRoutes(public)
 	cartModule.RegisterRoutes(protected)
 	voiceModule.RegisterRoutes(protected)
+	photoSearchModule.RegisterRoutes(protected)
 	imagesModule.RegisterRoutes(admin)
 
 	httpServer := &http.Server{

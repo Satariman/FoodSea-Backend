@@ -4,10 +4,6 @@ import grpc
 
 from . import catalog_pb2 as catalog__pb2
 
-_grpc_experimental = getattr(grpc, "experimental", None)
-_ListProductsForMLRequest = getattr(catalog__pb2, "ListProductsForMLRequest")
-_ListProductsForMLResponse = getattr(catalog__pb2, "ListProductsForMLResponse")
-
 
 class CatalogServiceStub(object):
     """Missing associated documentation comment in .proto file."""
@@ -20,8 +16,8 @@ class CatalogServiceStub(object):
         """
         self.ListProductsForML = channel.unary_unary(
                 '/core.CatalogService/ListProductsForML',
-                request_serializer=_ListProductsForMLRequest.SerializeToString,
-                response_deserializer=_ListProductsForMLResponse.FromString,
+                request_serializer=catalog__pb2.ListProductsForMLRequest.SerializeToString,
+                response_deserializer=catalog__pb2.ListProductsForMLResponse.FromString,
                 )
 
 
@@ -40,8 +36,8 @@ def add_CatalogServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'ListProductsForML': grpc.unary_unary_rpc_method_handler(
                     servicer.ListProductsForML,
-                    request_deserializer=_ListProductsForMLRequest.FromString,
-                    response_serializer=_ListProductsForMLResponse.SerializeToString,
+                    request_deserializer=catalog__pb2.ListProductsForMLRequest.FromString,
+                    response_serializer=catalog__pb2.ListProductsForMLResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -64,10 +60,8 @@ class CatalogService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        if _grpc_experimental is None:
-            raise RuntimeError("grpc.experimental is unavailable in this grpcio runtime")
-        return _grpc_experimental.unary_unary(request, target, '/core.CatalogService/ListProductsForML',
-            _ListProductsForMLRequest.SerializeToString,
-            _ListProductsForMLResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/core.CatalogService/ListProductsForML',
+            catalog__pb2.ListProductsForMLRequest.SerializeToString,
+            catalog__pb2.ListProductsForMLResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

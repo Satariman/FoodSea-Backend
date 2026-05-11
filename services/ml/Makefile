@@ -1,4 +1,4 @@
-.PHONY: install proto test run probe-weights
+.PHONY: install proto test run probe-weights rebuild-photo-index
 
 PYTHON ?= python3
 VENV_PY := .venv/bin/python
@@ -38,3 +38,6 @@ run:
 
 probe-weights:
 	$(PYTHON) -m src.weight_probe $(ARGS)
+
+rebuild-photo-index:
+	$(PYTHON) -m src.photo_search.rebuild_index

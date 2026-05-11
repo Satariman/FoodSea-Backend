@@ -59,6 +59,8 @@ func HandleError(c *gin.Context, err error) {
 		c.JSON(http.StatusUnauthorized, Response{Error: "unauthorized"})
 	case errors.Is(err, sherrors.ErrConflict):
 		c.JSON(http.StatusConflict, Response{Error: err.Error()})
+	case errors.Is(err, sherrors.ErrUnavailable):
+		c.JSON(http.StatusServiceUnavailable, Response{Error: err.Error()})
 	default:
 		var ve *sherrors.ValidationError
 		if errors.As(err, &ve) {

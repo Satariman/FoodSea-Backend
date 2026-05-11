@@ -21,6 +21,7 @@ import (
 	"github.com/foodsea/core/ent/cartitem"
 	"github.com/foodsea/core/ent/category"
 	"github.com/foodsea/core/ent/deliverycondition"
+	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
 	"github.com/foodsea/core/ent/product"
 	"github.com/foodsea/core/ent/productnutrition"
@@ -43,6 +44,8 @@ type Client struct {
 	Category *CategoryClient
 	// DeliveryCondition is the client for interacting with the DeliveryCondition builders.
 	DeliveryCondition *DeliveryConditionClient
+	// OAuthIdentity is the client for interacting with the OAuthIdentity builders.
+	OAuthIdentity *OAuthIdentityClient
 	// Offer is the client for interacting with the Offer builders.
 	Offer *OfferClient
 	// Product is the client for interacting with the Product builders.
@@ -69,6 +72,7 @@ func (c *Client) init() {
 	c.CartItem = NewCartItemClient(c.config)
 	c.Category = NewCategoryClient(c.config)
 	c.DeliveryCondition = NewDeliveryConditionClient(c.config)
+	c.OAuthIdentity = NewOAuthIdentityClient(c.config)
 	c.Offer = NewOfferClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.ProductNutrition = NewProductNutritionClient(c.config)
@@ -171,6 +175,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CartItem:          NewCartItemClient(cfg),
 		Category:          NewCategoryClient(cfg),
 		DeliveryCondition: NewDeliveryConditionClient(cfg),
+		OAuthIdentity:     NewOAuthIdentityClient(cfg),
 		Offer:             NewOfferClient(cfg),
 		Product:           NewProductClient(cfg),
 		ProductNutrition:  NewProductNutritionClient(cfg),
@@ -200,6 +205,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CartItem:          NewCartItemClient(cfg),
 		Category:          NewCategoryClient(cfg),
 		DeliveryCondition: NewDeliveryConditionClient(cfg),
+		OAuthIdentity:     NewOAuthIdentityClient(cfg),
 		Offer:             NewOfferClient(cfg),
 		Product:           NewProductClient(cfg),
 		ProductNutrition:  NewProductNutritionClient(cfg),
@@ -234,8 +240,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Brand, c.Cart, c.CartItem, c.Category, c.DeliveryCondition, c.Offer,
-		c.Product, c.ProductNutrition, c.Store, c.User,
+		c.Brand, c.Cart, c.CartItem, c.Category, c.DeliveryCondition, c.OAuthIdentity,
+		c.Offer, c.Product, c.ProductNutrition, c.Store, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -245,8 +251,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Brand, c.Cart, c.CartItem, c.Category, c.DeliveryCondition, c.Offer,
-		c.Product, c.ProductNutrition, c.Store, c.User,
+		c.Brand, c.Cart, c.CartItem, c.Category, c.DeliveryCondition, c.OAuthIdentity,
+		c.Offer, c.Product, c.ProductNutrition, c.Store, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -265,6 +271,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Category.mutate(ctx, m)
 	case *DeliveryConditionMutation:
 		return c.DeliveryCondition.mutate(ctx, m)
+	case *OAuthIdentityMutation:
+		return c.OAuthIdentity.mutate(ctx, m)
 	case *OfferMutation:
 		return c.Offer.mutate(ctx, m)
 	case *ProductMutation:
@@ -1106,6 +1114,156 @@ func (c *DeliveryConditionClient) mutate(ctx context.Context, m *DeliveryConditi
 	}
 }
 
+// OAuthIdentityClient is a client for the OAuthIdentity schema.
+type OAuthIdentityClient struct {
+	config
+}
+
+// NewOAuthIdentityClient returns a client for the OAuthIdentity from the given config.
+func NewOAuthIdentityClient(c config) *OAuthIdentityClient {
+	return &OAuthIdentityClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `oauthidentity.Hooks(f(g(h())))`.
+func (c *OAuthIdentityClient) Use(hooks ...Hook) {
+	c.hooks.OAuthIdentity = append(c.hooks.OAuthIdentity, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `oauthidentity.Intercept(f(g(h())))`.
+func (c *OAuthIdentityClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OAuthIdentity = append(c.inters.OAuthIdentity, interceptors...)
+}
+
+// Create returns a builder for creating a OAuthIdentity entity.
+func (c *OAuthIdentityClient) Create() *OAuthIdentityCreate {
+	mutation := newOAuthIdentityMutation(c.config, OpCreate)
+	return &OAuthIdentityCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OAuthIdentity entities.
+func (c *OAuthIdentityClient) CreateBulk(builders ...*OAuthIdentityCreate) *OAuthIdentityCreateBulk {
+	return &OAuthIdentityCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OAuthIdentityClient) MapCreateBulk(slice any, setFunc func(*OAuthIdentityCreate, int)) *OAuthIdentityCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OAuthIdentityCreateBulk{err: fmt.Errorf("calling to OAuthIdentityClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OAuthIdentityCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OAuthIdentityCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OAuthIdentity.
+func (c *OAuthIdentityClient) Update() *OAuthIdentityUpdate {
+	mutation := newOAuthIdentityMutation(c.config, OpUpdate)
+	return &OAuthIdentityUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OAuthIdentityClient) UpdateOne(_m *OAuthIdentity) *OAuthIdentityUpdateOne {
+	mutation := newOAuthIdentityMutation(c.config, OpUpdateOne, withOAuthIdentity(_m))
+	return &OAuthIdentityUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OAuthIdentityClient) UpdateOneID(id uuid.UUID) *OAuthIdentityUpdateOne {
+	mutation := newOAuthIdentityMutation(c.config, OpUpdateOne, withOAuthIdentityID(id))
+	return &OAuthIdentityUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OAuthIdentity.
+func (c *OAuthIdentityClient) Delete() *OAuthIdentityDelete {
+	mutation := newOAuthIdentityMutation(c.config, OpDelete)
+	return &OAuthIdentityDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OAuthIdentityClient) DeleteOne(_m *OAuthIdentity) *OAuthIdentityDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OAuthIdentityClient) DeleteOneID(id uuid.UUID) *OAuthIdentityDeleteOne {
+	builder := c.Delete().Where(oauthidentity.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OAuthIdentityDeleteOne{builder}
+}
+
+// Query returns a query builder for OAuthIdentity.
+func (c *OAuthIdentityClient) Query() *OAuthIdentityQuery {
+	return &OAuthIdentityQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOAuthIdentity},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OAuthIdentity entity by its id.
+func (c *OAuthIdentityClient) Get(ctx context.Context, id uuid.UUID) (*OAuthIdentity, error) {
+	return c.Query().Where(oauthidentity.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OAuthIdentityClient) GetX(ctx context.Context, id uuid.UUID) *OAuthIdentity {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a OAuthIdentity.
+func (c *OAuthIdentityClient) QueryUser(_m *OAuthIdentity) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(oauthidentity.Table, oauthidentity.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, oauthidentity.UserTable, oauthidentity.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *OAuthIdentityClient) Hooks() []Hook {
+	hooks := c.hooks.OAuthIdentity
+	return append(hooks[:len(hooks):len(hooks)], oauthidentity.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *OAuthIdentityClient) Interceptors() []Interceptor {
+	return c.inters.OAuthIdentity
+}
+
+func (c *OAuthIdentityClient) mutate(ctx context.Context, m *OAuthIdentityMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OAuthIdentityCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OAuthIdentityUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OAuthIdentityUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OAuthIdentityDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OAuthIdentity mutation op: %q", m.Op())
+	}
+}
+
 // OfferClient is a client for the Offer schema.
 type OfferClient struct {
 	config
@@ -1939,6 +2097,22 @@ func (c *UserClient) QueryCart(_m *User) *CartQuery {
 	return query
 }
 
+// QueryOauthIdentities queries the oauth_identities edge of a User.
+func (c *UserClient) QueryOauthIdentities(_m *User) *OAuthIdentityQuery {
+	query := (&OAuthIdentityClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(oauthidentity.Table, oauthidentity.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.OauthIdentitiesTable, user.OauthIdentitiesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *UserClient) Hooks() []Hook {
 	hooks := c.hooks.User
@@ -1968,11 +2142,11 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Brand, Cart, CartItem, Category, DeliveryCondition, Offer, Product,
-		ProductNutrition, Store, User []ent.Hook
+		Brand, Cart, CartItem, Category, DeliveryCondition, OAuthIdentity, Offer,
+		Product, ProductNutrition, Store, User []ent.Hook
 	}
 	inters struct {
-		Brand, Cart, CartItem, Category, DeliveryCondition, Offer, Product,
-		ProductNutrition, Store, User []ent.Interceptor
+		Brand, Cart, CartItem, Category, DeliveryCondition, OAuthIdentity, Offer,
+		Product, ProductNutrition, Store, User []ent.Interceptor
 	}
 )

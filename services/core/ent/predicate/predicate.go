@@ -21,6 +21,9 @@ type Category func(*sql.Selector)
 // DeliveryCondition is the predicate function for deliverycondition builders.
 type DeliveryCondition func(*sql.Selector)
 
+// OAuthIdentity is the predicate function for oauthidentity builders.
+type OAuthIdentity func(*sql.Selector)
+
 // Offer is the predicate function for offer builders.
 type Offer func(*sql.Selector)
 

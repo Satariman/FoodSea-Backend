@@ -48,6 +48,10 @@ create_secret() {
   kubectl -n "${NS}" create secret generic "${name}" "$@" --dry-run=client -o yaml | kubectl apply -f -
 }
 
+urlencode() {
+  jq -rn --arg v "$1" '$v|@uri'
+}
+
 kubectl apply -f "${OVERLAY}/namespace.yaml"
 
 CORE_DB_PASSWORD="${CORE_DB_PASSWORD:-$(secret_value core-secrets DB_PASSWORD)}"
@@ -57,20 +61,24 @@ JWT_SECRET="${JWT_SECRET:-$(secret_value core-secrets JWT_SECRET)}"
 MINIO_ROOT_USER="${MINIO_ROOT_USER:-$(secret_value minio-secrets MINIO_ROOT_USER minioadmin)}"
 MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-$(secret_value minio-secrets MINIO_ROOT_PASSWORD)}"
 
+CORE_DB_PASSWORD_URLENC="$(urlencode "${CORE_DB_PASSWORD}")"
+OPTIMIZATION_DB_PASSWORD_URLENC="$(urlencode "${OPTIMIZATION_DB_PASSWORD}")"
+ORDERING_DB_PASSWORD_URLENC="$(urlencode "${ORDERING_DB_PASSWORD}")"
+
 create_secret core-secrets \
-  --from-literal=DB_URL="postgres://postgres:${CORE_DB_PASSWORD}@core-postgres:5432/core_db?sslmode=disable" \
+  --from-literal=DB_URL="postgres://postgres:${CORE_DB_PASSWORD_URLENC}@core-postgres:5432/core_db?sslmode=disable" \
   --from-literal=DB_USER=postgres \
   --from-literal=DB_PASSWORD="${CORE_DB_PASSWORD}" \
   --from-literal=JWT_SECRET="${JWT_SECRET}"
 
 create_secret optimization-secrets \
-  --from-literal=DB_URL="postgres://postgres:${OPTIMIZATION_DB_PASSWORD}@optimization-postgres:5432/optimization_db?sslmode=disable" \
+  --from-literal=DB_URL="postgres://postgres:${OPTIMIZATION_DB_PASSWORD_URLENC}@optimization-postgres:5432/optimization_db?sslmode=disable" \
   --from-literal=DB_USER=postgres \
   --from-literal=DB_PASSWORD="${OPTIMIZATION_DB_PASSWORD}" \
   --from-literal=JWT_SECRET="${JWT_SECRET}"
 
 create_secret ordering-secrets \
-  --from-literal=DB_URL="postgres://postgres:${ORDERING_DB_PASSWORD}@ordering-postgres:5432/ordering_db?sslmode=disable" \
+  --from-literal=DB_URL="postgres://postgres:${ORDERING_DB_PASSWORD_URLENC}@ordering-postgres:5432/ordering_db?sslmode=disable" \
   --from-literal=DB_USER=postgres \
   --from-literal=DB_PASSWORD="${ORDERING_DB_PASSWORD}" \
   --from-literal=JWT_SECRET="${JWT_SECRET}"
@@ -110,18 +118,18 @@ sed -i.bak \
 
 kubectl apply -f "${TMP_MANIFEST}"
 
-kubectl -n "${NS}" wait --for=condition=complete job/migrate-core --timeout=180s
-kubectl -n "${NS}" wait --for=condition=complete job/migrate-optimization --timeout=180s
-kubectl -n "${NS}" wait --for=condition=complete job/migrate-ordering --timeout=180s
-kubectl -n "${NS}" wait --for=condition=complete job/kafka-init-topics --timeout=180s
+kubectl -n "${NS}" wait --for=condition=complete job/migrate-core --timeout=600s
+kubectl -n "${NS}" wait --for=condition=complete job/migrate-optimization --timeout=600s
+kubectl -n "${NS}" wait --for=condition=complete job/migrate-ordering --timeout=600s
+kubectl -n "${NS}" wait --for=condition=complete job/kafka-init-topics --timeout=600s
 
-kubectl -n "${NS}" rollout status statefulset/core-postgres --timeout=180s
-kubectl -n "${NS}" rollout status statefulset/optimization-postgres --timeout=180s
-kubectl -n "${NS}" rollout status statefulset/ordering-postgres --timeout=180s
-kubectl -n "${NS}" rollout status deployment/core-service --timeout=240s
-kubectl -n "${NS}" rollout status deployment/optimization-service --timeout=240s
-kubectl -n "${NS}" rollout status deployment/ordering-service --timeout=240s
-kubectl -n "${NS}" rollout status deployment/ml-service --timeout=240s
+kubectl -n "${NS}" rollout status statefulset/core-postgres --timeout=600s
+kubectl -n "${NS}" rollout status statefulset/optimization-postgres --timeout=600s
+kubectl -n "${NS}" rollout status statefulset/ordering-postgres --timeout=600s
+kubectl -n "${NS}" rollout status deployment/core-service --timeout=600s
+kubectl -n "${NS}" rollout status deployment/optimization-service --timeout=600s
+kubectl -n "${NS}" rollout status deployment/ordering-service --timeout=600s
+kubectl -n "${NS}" rollout status deployment/ml-service --timeout=600s
 
 curl -fsS -H "Host: ${FOODSEA_HOST}" "${SMOKE_SCHEME}://${SMOKE_ADDR}/api/v1/categories" >/dev/null
 

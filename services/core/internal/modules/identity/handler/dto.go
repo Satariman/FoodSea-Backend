@@ -24,6 +24,21 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+type OAuthStartResponse struct {
+	AuthURL string `json:"auth_url"`
+	State   string `json:"state"`
+}
+
+type OAuthCallbackRequest struct {
+	Code        string `json:"code" binding:"required"`
+	State       string `json:"state" binding:"required"`
+	RedirectURI string `json:"redirect_uri" binding:"required"`
+}
+
+type OAuthNativeSDKCallbackRequest struct {
+	AccessToken string `json:"access_token" binding:"required"`
+}
+
 type UserResponse struct {
 	ID             uuid.UUID `json:"id"`
 	Phone          *string   `json:"phone,omitempty"`

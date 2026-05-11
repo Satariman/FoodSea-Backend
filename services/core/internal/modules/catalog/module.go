@@ -86,6 +86,11 @@ func (m *Module) RegisterRoutes(public *gin.RouterGroup) {
 	public.GET("/products/:id", m.productHandler.GetProduct)
 }
 
+// ProductLoader returns the main product loader use case.
+func (m *Module) ProductLoader() *usecase.GetProduct {
+	return m.GetProduct
+}
+
 // ProductGetter returns a ProductGetter backed by the GetProductByBarcode use case.
 func (m *Module) ProductGetter() ProductGetter {
 	return m.GetProductByBarcode
