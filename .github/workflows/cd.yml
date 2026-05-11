@@ -201,7 +201,9 @@ jobs:
             git rev-parse HEAD
 
             python3 -m venv services/ml/.venv
-            make -C services/ml install
+            services/ml/.venv/bin/python -m pip install -U pip "setuptools>=68,<82" wheel
+            services/ml/.venv/bin/python -m pip install -r services/ml/requirements-runtime.txt pytest==8.2.2
+            services/ml/.venv/bin/python -m pip install -e services/ml --no-deps
             make test-all
 
             check_code() {
