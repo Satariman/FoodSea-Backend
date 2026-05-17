@@ -13,7 +13,7 @@ OUT_DIR = src/proto
 
 install:
 	$(PIP) install -U pip "setuptools>=68,<82" wheel
-	$(PIP) install -r requirements.txt
+	$(PIP) install -r requirements-builder.txt
 	$(PIP) install -e .
 
 proto:
