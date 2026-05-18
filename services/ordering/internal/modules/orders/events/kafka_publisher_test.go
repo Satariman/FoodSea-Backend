@@ -83,6 +83,10 @@ func TestOrderCreated_PublishesEventWithItems(t *testing.T) {
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(ev.Payload, &payload))
 	assert.Equal(t, orderID.String(), payload["order_id"])
+	assert.Equal(t, userID.String(), payload["user_id"])
+	assert.Equal(t, "created", payload["status"])
+	_, hasOccurredAt := payload["occurred_at"]
+	assert.True(t, hasOccurredAt)
 	assert.Equal(t, float64(5000), payload["total_kopecks"])
 
 	items, ok := payload["items"].([]any)
@@ -90,32 +94,63 @@ func TestOrderCreated_PublishesEventWithItems(t *testing.T) {
 	require.Len(t, items, 1)
 }
 
-func TestOrderStatusChanged_PayloadContainsBothStatuses(t *testing.T) {
+func TestOrderConfirmed_PayloadContainsUserStatusAndOccurredAt(t *testing.T) {
 	captured := &capturedPublisherHelper{}
 	pub := events.NewTestablePublisher(captured, makeLog())
 
 	orderID := uuid.New()
-	err := pub.OrderStatusChanged(context.Background(), orderID, shared.StatusCreated, shared.StatusConfirmed)
+	userID := uuid.New()
+	err := pub.OrderConfirmed(context.Background(), orderID, userID)
 	require.NoError(t, err)
 
 	require.Len(t, captured.events, 1)
+	assert.Equal(t, "order.confirmed", captured.events[0].EventType)
+
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(captured.events[0].Payload, &payload))
-	assert.Equal(t, "created", payload["old_status"])
-	assert.Equal(t, "confirmed", payload["new_status"])
+	assert.Equal(t, orderID.String(), payload["order_id"])
+	assert.Equal(t, userID.String(), payload["user_id"])
+	assert.Equal(t, "confirmed", payload["status"])
+	_, hasOccurredAt := payload["occurred_at"]
+	assert.True(t, hasOccurredAt)
 }
 
-func TestOrderCancelled_PayloadHasReason(t *testing.T) {
+func TestOrderStatusChanged_PayloadContainsUserStatusAndOccurredAt(t *testing.T) {
 	captured := &capturedPublisherHelper{}
 	pub := events.NewTestablePublisher(captured, makeLog())
 
 	orderID := uuid.New()
-	err := pub.OrderCancelled(context.Background(), orderID, "user cancelled")
+	userID := uuid.New()
+	err := pub.OrderStatusChanged(context.Background(), orderID, userID, shared.StatusCreated, shared.StatusConfirmed)
 	require.NoError(t, err)
 
 	require.Len(t, captured.events, 1)
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(captured.events[0].Payload, &payload))
+	assert.Equal(t, orderID.String(), payload["order_id"])
+	assert.Equal(t, userID.String(), payload["user_id"])
+	assert.Equal(t, "confirmed", payload["status"])
+	_, hasOccurredAt := payload["occurred_at"]
+	assert.True(t, hasOccurredAt)
+}
+
+func TestOrderCancelled_PayloadContainsUserStatusAndOccurredAt(t *testing.T) {
+	captured := &capturedPublisherHelper{}
+	pub := events.NewTestablePublisher(captured, makeLog())
+
+	orderID := uuid.New()
+	userID := uuid.New()
+	err := pub.OrderCancelled(context.Background(), orderID, userID, "user cancelled")
+	require.NoError(t, err)
+
+	require.Len(t, captured.events, 1)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(captured.events[0].Payload, &payload))
+	assert.Equal(t, orderID.String(), payload["order_id"])
+	assert.Equal(t, userID.String(), payload["user_id"])
+	assert.Equal(t, "cancelled", payload["status"])
+	_, hasOccurredAt := payload["occurred_at"]
+	assert.True(t, hasOccurredAt)
 	assert.Equal(t, "user cancelled", payload["reason"])
 }
 

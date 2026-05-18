@@ -37,7 +37,7 @@ func (uc *UpdateStatus) Execute(ctx context.Context, orderID uuid.UUID, to share
 		return err
 	}
 
-	if err = uc.publisher.OrderStatusChanged(ctx, orderID, prevStatus, to); err != nil {
+	if err = uc.publisher.OrderStatusChanged(ctx, orderID, order.UserID, prevStatus, to); err != nil {
 		uc.log.WarnContext(ctx, "order.status_changed event publish failed", "order_id", orderID, "error", err)
 	}
 	return nil

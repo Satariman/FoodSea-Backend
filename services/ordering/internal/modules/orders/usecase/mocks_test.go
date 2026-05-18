@@ -47,15 +47,15 @@ func (m *mockOrderEventPublisher) OrderCreated(ctx context.Context, order *domai
 	args := m.Called(ctx, order)
 	return args.Error(0)
 }
-func (m *mockOrderEventPublisher) OrderConfirmed(ctx context.Context, orderID uuid.UUID) error {
-	args := m.Called(ctx, orderID)
+func (m *mockOrderEventPublisher) OrderConfirmed(ctx context.Context, orderID, userID uuid.UUID) error {
+	args := m.Called(ctx, orderID, userID)
 	return args.Error(0)
 }
-func (m *mockOrderEventPublisher) OrderStatusChanged(ctx context.Context, orderID uuid.UUID, old, new shared.OrderStatus) error {
-	args := m.Called(ctx, orderID, old, new)
+func (m *mockOrderEventPublisher) OrderStatusChanged(ctx context.Context, orderID, userID uuid.UUID, old, new shared.OrderStatus) error {
+	args := m.Called(ctx, orderID, userID, old, new)
 	return args.Error(0)
 }
-func (m *mockOrderEventPublisher) OrderCancelled(ctx context.Context, orderID uuid.UUID, reason string) error {
-	args := m.Called(ctx, orderID, reason)
+func (m *mockOrderEventPublisher) OrderCancelled(ctx context.Context, orderID, userID uuid.UUID, reason string) error {
+	args := m.Called(ctx, orderID, userID, reason)
 	return args.Error(0)
 }

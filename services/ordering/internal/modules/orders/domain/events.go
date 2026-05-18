@@ -11,7 +11,7 @@ import (
 // OrderEventPublisher publishes domain events to the order.events Kafka topic.
 type OrderEventPublisher interface {
 	OrderCreated(ctx context.Context, order *Order) error
-	OrderConfirmed(ctx context.Context, orderID uuid.UUID) error
-	OrderStatusChanged(ctx context.Context, orderID uuid.UUID, old, new shared.OrderStatus) error
-	OrderCancelled(ctx context.Context, orderID uuid.UUID, reason string) error
+	OrderConfirmed(ctx context.Context, orderID, userID uuid.UUID) error
+	OrderStatusChanged(ctx context.Context, orderID, userID uuid.UUID, old, new shared.OrderStatus) error
+	OrderCancelled(ctx context.Context, orderID, userID uuid.UUID, reason string) error
 }

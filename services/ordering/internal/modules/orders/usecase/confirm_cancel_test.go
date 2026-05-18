@@ -21,9 +21,11 @@ func TestConfirmOrder_Success(t *testing.T) {
 	uc := usecase.NewConfirmOrder(repo, pub, discardLogger())
 
 	orderID := uuid.New()
+	userID := uuid.New()
+	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, UserID: userID}, nil)
 	repo.On("TransitionStatus", mock.Anything, orderID, shared.StatusConfirmed, (*string)(nil)).Return(nil)
-	pub.On("OrderConfirmed", mock.Anything, orderID).Return(nil)
-	pub.On("OrderStatusChanged", mock.Anything, orderID, shared.StatusCreated, shared.StatusConfirmed).Return(nil)
+	pub.On("OrderConfirmed", mock.Anything, orderID, userID).Return(nil)
+	pub.On("OrderStatusChanged", mock.Anything, orderID, userID, shared.StatusCreated, shared.StatusConfirmed).Return(nil)
 
 	err := uc.Execute(context.Background(), orderID)
 	require.NoError(t, err)
@@ -35,6 +37,7 @@ func TestConfirmOrder_AlreadyConfirmed_ErrConflict(t *testing.T) {
 	uc := usecase.NewConfirmOrder(repo, pub, discardLogger())
 
 	orderID := uuid.New()
+	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, UserID: uuid.New()}, nil)
 	repo.On("TransitionStatus", mock.Anything, orderID, shared.StatusConfirmed, (*string)(nil)).Return(sherrors.ErrConflict)
 
 	err := uc.Execute(context.Background(), orderID)
@@ -48,12 +51,13 @@ func TestCancelOrder_Success(t *testing.T) {
 	uc := usecase.NewCancelOrder(repo, pub, discardLogger())
 
 	orderID := uuid.New()
+	userID := uuid.New()
 	reason := "user request"
 
-	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, Status: shared.StatusCreated}, nil)
+	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, UserID: userID, Status: shared.StatusCreated}, nil)
 	repo.On("TransitionStatus", mock.Anything, orderID, shared.StatusCancelled, &reason).Return(nil)
-	pub.On("OrderCancelled", mock.Anything, orderID, reason).Return(nil)
-	pub.On("OrderStatusChanged", mock.Anything, orderID, shared.StatusCreated, shared.StatusCancelled).Return(nil)
+	pub.On("OrderCancelled", mock.Anything, orderID, userID, reason).Return(nil)
+	pub.On("OrderStatusChanged", mock.Anything, orderID, userID, shared.StatusCreated, shared.StatusCancelled).Return(nil)
 
 	err := uc.Execute(context.Background(), orderID, reason)
 	require.NoError(t, err)
@@ -76,7 +80,7 @@ func TestCancelOrder_DeliveredOrder_ErrConflict(t *testing.T) {
 	orderID := uuid.New()
 	reason := "want to cancel"
 
-	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, Status: shared.StatusDelivered}, nil)
+	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, UserID: uuid.New(), Status: shared.StatusDelivered}, nil)
 	repo.On("TransitionStatus", mock.Anything, orderID, shared.StatusCancelled, &reason).Return(sherrors.ErrConflict)
 
 	err := uc.Execute(context.Background(), orderID, reason)
@@ -127,9 +131,10 @@ func TestUpdateStatus_ValidTransition(t *testing.T) {
 	uc := usecase.NewUpdateStatus(repo, pub, discardLogger())
 
 	orderID := uuid.New()
-	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, Status: shared.StatusCreated}, nil)
+	userID := uuid.New()
+	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, UserID: userID, Status: shared.StatusCreated}, nil)
 	repo.On("TransitionStatus", mock.Anything, orderID, shared.StatusConfirmed, (*string)(nil)).Return(nil)
-	pub.On("OrderStatusChanged", mock.Anything, orderID, shared.StatusCreated, shared.StatusConfirmed).Return(nil)
+	pub.On("OrderStatusChanged", mock.Anything, orderID, userID, shared.StatusCreated, shared.StatusConfirmed).Return(nil)
 
 	err := uc.Execute(context.Background(), orderID, shared.StatusConfirmed, nil)
 	require.NoError(t, err)
@@ -141,7 +146,7 @@ func TestUpdateStatus_InvalidTransition(t *testing.T) {
 	uc := usecase.NewUpdateStatus(repo, pub, discardLogger())
 
 	orderID := uuid.New()
-	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, Status: shared.StatusCreated}, nil)
+	repo.On("GetByID", mock.Anything, orderID).Return(&domain.Order{ID: orderID, UserID: uuid.New(), Status: shared.StatusCreated}, nil)
 
 	// created → delivered is not allowed by FSM
 	err := uc.Execute(context.Background(), orderID, shared.StatusDelivered, nil)

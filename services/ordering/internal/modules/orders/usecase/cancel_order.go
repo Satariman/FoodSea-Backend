@@ -37,10 +37,10 @@ func (uc *CancelOrder) Execute(ctx context.Context, orderID uuid.UUID, reason st
 		return err
 	}
 
-	if err = uc.publisher.OrderCancelled(ctx, orderID, reason); err != nil {
+	if err = uc.publisher.OrderCancelled(ctx, orderID, prevOrder.UserID, reason); err != nil {
 		uc.log.WarnContext(ctx, "order.cancelled event publish failed", "order_id", orderID, "error", err)
 	}
-	if err = uc.publisher.OrderStatusChanged(ctx, orderID, prevStatus, shared.StatusCancelled); err != nil {
+	if err = uc.publisher.OrderStatusChanged(ctx, orderID, prevOrder.UserID, prevStatus, shared.StatusCancelled); err != nil {
 		uc.log.WarnContext(ctx, "order.status_changed event publish failed", "order_id", orderID, "error", err)
 	}
 	return nil

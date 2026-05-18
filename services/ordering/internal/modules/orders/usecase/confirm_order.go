@@ -22,14 +22,19 @@ func NewConfirmOrder(repo domain.OrderRepository, publisher domain.OrderEventPub
 }
 
 func (uc *ConfirmOrder) Execute(ctx context.Context, orderID uuid.UUID) error {
-	if err := uc.repo.TransitionStatus(ctx, orderID, shared.StatusConfirmed, nil); err != nil {
+	order, err := uc.repo.GetByID(ctx, orderID)
+	if err != nil {
 		return err
 	}
 
-	if err := uc.publisher.OrderConfirmed(ctx, orderID); err != nil {
+	if err = uc.repo.TransitionStatus(ctx, orderID, shared.StatusConfirmed, nil); err != nil {
+		return err
+	}
+
+	if err = uc.publisher.OrderConfirmed(ctx, orderID, order.UserID); err != nil {
 		uc.log.WarnContext(ctx, "order.confirmed event publish failed", "order_id", orderID, "error", err)
 	}
-	if err := uc.publisher.OrderStatusChanged(ctx, orderID, shared.StatusCreated, shared.StatusConfirmed); err != nil {
+	if err = uc.publisher.OrderStatusChanged(ctx, orderID, order.UserID, shared.StatusCreated, shared.StatusConfirmed); err != nil {
 		uc.log.WarnContext(ctx, "order.status_changed event publish failed", "order_id", orderID, "error", err)
 	}
 	return nil

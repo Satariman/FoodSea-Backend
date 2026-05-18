@@ -27,9 +27,14 @@ type EventSink interface {
 	Capture(event kafka.Event)
 }
 
+type orderEventProducer interface {
+	Publish(ctx context.Context, event kafka.Event) error
+	PublishWithKey(ctx context.Context, key string, event kafka.Event) error
+}
+
 // KafkaPublisher implements domain.OrderEventPublisher using the Kafka producer.
 type KafkaPublisher struct {
-	producer *kafka.Producer
+	producer orderEventProducer
 	sink     EventSink // non-nil only in tests
 	log      *slog.Logger
 }
@@ -47,10 +52,11 @@ func NewTestablePublisher(sink EventSink, log *slog.Logger) *KafkaPublisher {
 type orderCreatedPayload struct {
 	OrderID    string              `json:"order_id"`
 	UserID     string              `json:"user_id"`
+	Status     shared.OrderStatus  `json:"status"`
+	OccurredAt time.Time           `json:"occurred_at"`
 	Total      int64               `json:"total_kopecks"`
 	Delivery   int64               `json:"delivery_kopecks"`
 	Items      []orderItemSnapshot `json:"items"`
-	CreatedAt  time.Time           `json:"created_at"`
 }
 
 type orderItemSnapshot struct {
@@ -63,21 +69,27 @@ type orderItemSnapshot struct {
 }
 
 type orderConfirmedPayload struct {
-	OrderID string `json:"order_id"`
+	OrderID    string             `json:"order_id"`
+	UserID     string             `json:"user_id"`
+	Status     shared.OrderStatus `json:"status"`
+	OccurredAt time.Time          `json:"occurred_at"`
 }
 
 type orderStatusChangedPayload struct {
-	OrderID   string `json:"order_id"`
-	OldStatus string `json:"old_status"`
-	NewStatus string `json:"new_status"`
-	ChangedAt string `json:"changed_at"`
-	Comment   string `json:"comment,omitempty"`
+	OrderID    string             `json:"order_id"`
+	UserID     string             `json:"user_id"`
+	Status     shared.OrderStatus `json:"status"`
+	OccurredAt time.Time          `json:"occurred_at"`
+	OldStatus  string             `json:"old_status"`
+	NewStatus  string             `json:"new_status"`
 }
 
 type orderCancelledPayload struct {
-	OrderID     string `json:"order_id"`
-	Reason      string `json:"reason"`
-	CancelledAt string `json:"cancelled_at"`
+	OrderID    string             `json:"order_id"`
+	UserID     string             `json:"user_id"`
+	Status     shared.OrderStatus `json:"status"`
+	OccurredAt time.Time          `json:"occurred_at"`
+	Reason     string             `json:"reason"`
 }
 
 func (p *KafkaPublisher) OrderCreated(ctx context.Context, order *domain.Order) error {
@@ -93,38 +105,48 @@ func (p *KafkaPublisher) OrderCreated(ctx context.Context, order *domain.Order) 
 		}
 	}
 	payload := orderCreatedPayload{
-		OrderID:   order.ID.String(),
-		UserID:    order.UserID.String(),
-		Total:     order.TotalKopecks,
-		Delivery:  order.DeliveryKopecks,
-		Items:     items,
-		CreatedAt: order.CreatedAt,
+		OrderID:    order.ID.String(),
+		UserID:     order.UserID.String(),
+		Status:     shared.StatusCreated,
+		OccurredAt: order.CreatedAt.UTC(),
+		Total:      order.TotalKopecks,
+		Delivery:   order.DeliveryKopecks,
+		Items:      items,
 	}
-	return p.publish(ctx, EventOrderCreated, payload)
+	return p.publish(ctx, EventOrderCreated, order.ID, payload)
 }
 
-func (p *KafkaPublisher) OrderConfirmed(ctx context.Context, orderID uuid.UUID) error {
-	return p.publish(ctx, EventOrderConfirmed, orderConfirmedPayload{OrderID: orderID.String()})
-}
-
-func (p *KafkaPublisher) OrderStatusChanged(ctx context.Context, orderID uuid.UUID, old, new shared.OrderStatus) error {
-	return p.publish(ctx, EventOrderStatusChanged, orderStatusChangedPayload{
-		OrderID:   orderID.String(),
-		OldStatus: old.String(),
-		NewStatus: new.String(),
-		ChangedAt: time.Now().UTC().Format(time.RFC3339),
+func (p *KafkaPublisher) OrderConfirmed(ctx context.Context, orderID, userID uuid.UUID) error {
+	return p.publish(ctx, EventOrderConfirmed, orderID, orderConfirmedPayload{
+		OrderID:    orderID.String(),
+		UserID:     userID.String(),
+		Status:     shared.StatusConfirmed,
+		OccurredAt: time.Now().UTC(),
 	})
 }
 
-func (p *KafkaPublisher) OrderCancelled(ctx context.Context, orderID uuid.UUID, reason string) error {
-	return p.publish(ctx, EventOrderCancelled, orderCancelledPayload{
-		OrderID:     orderID.String(),
-		Reason:      reason,
-		CancelledAt: time.Now().UTC().Format(time.RFC3339),
+func (p *KafkaPublisher) OrderStatusChanged(ctx context.Context, orderID, userID uuid.UUID, old, new shared.OrderStatus) error {
+	return p.publish(ctx, EventOrderStatusChanged, orderID, orderStatusChangedPayload{
+		OrderID:    orderID.String(),
+		UserID:     userID.String(),
+		Status:     new,
+		OccurredAt: time.Now().UTC(),
+		OldStatus:  old.String(),
+		NewStatus:  new.String(),
 	})
 }
 
-func (p *KafkaPublisher) publish(ctx context.Context, eventType string, payload any) error {
+func (p *KafkaPublisher) OrderCancelled(ctx context.Context, orderID, userID uuid.UUID, reason string) error {
+	return p.publish(ctx, EventOrderCancelled, orderID, orderCancelledPayload{
+		OrderID:    orderID.String(),
+		UserID:     userID.String(),
+		Status:     shared.StatusCancelled,
+		OccurredAt: time.Now().UTC(),
+		Reason:     reason,
+	})
+}
+
+func (p *KafkaPublisher) publish(ctx context.Context, eventType string, orderID uuid.UUID, payload any) error {
 	event, err := kafka.NewEvent(eventType, source, payload)
 	if err != nil {
 		return err
@@ -133,9 +155,10 @@ func (p *KafkaPublisher) publish(ctx context.Context, eventType string, payload 
 		p.sink.Capture(event)
 		return nil
 	}
-	if err = p.producer.Publish(ctx, event); err != nil {
+	if err = p.producer.PublishWithKey(ctx, orderID.String(), event); err != nil {
 		p.log.WarnContext(ctx, "failed to publish order event",
 			"event_type", eventType,
+			"order_id", orderID,
 			"error", err,
 		)
 		return err
