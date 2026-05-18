@@ -57,7 +57,7 @@ func NewModule(deps Deps) *Module {
 		deps.JWT.RefreshTTL,
 		deps.Redis,
 	)
-	providers := make([]domain.OAuthProvider, 0, 2)
+	providers := make([]domain.OAuthProvider, 0, 3)
 	var googleLegacyProvider *repository.GoogleOAuthProvider
 	if deps.OAuth.Google.Enabled {
 		googleLegacyProvider = repository.NewGoogleOAuthProvider(deps.OAuth.Google, httpClient)
@@ -72,6 +72,9 @@ func NewModule(deps Deps) *Module {
 
 	if deps.OAuth.Yandex.Enabled {
 		providers = append(providers, repository.NewYandexOAuthProvider(deps.OAuth.Yandex, httpClient))
+	}
+	if deps.OAuth.AppleNative.Enabled {
+		providers = append(providers, repository.NewAppleOAuthProvider(deps.OAuth.AppleNative, httpClient))
 	}
 
 	reg := usecase.NewRegister(userRepo, hasher, tokenSvc)

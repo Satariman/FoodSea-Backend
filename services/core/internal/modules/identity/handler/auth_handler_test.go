@@ -101,6 +101,10 @@ func testUser() *domain.User {
 	return &domain.User{ID: uuid.New(), Email: &email, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 }
 
+func ptr(s string) *string {
+	return &s
+}
+
 func setupAuthRouter(h *AuthHandler) *gin.Engine {
 	r := gin.New()
 	r.POST("/auth/register", h.Register)
@@ -403,6 +407,37 @@ func TestAuthHandler_OAuthNativeCallback(t *testing.T) {
 			"redirect_uri": "foodsea://oauth/callback",
 		})
 		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("apple callback uses token flow => 200", func(t *testing.T) {
+		oauthCallback := &mockOAuthCallback{}
+		u := testUser()
+		pair := testPair()
+		oauthCallback.On("ExecuteToken", mock.Anything, domain.OAuthTokenCallbackRequest{
+			Provider:    domain.OAuthProviderApple,
+			AccessToken: "apple-identity-token",
+			FullName:    ptr("Ivan Ivanov"),
+			Email:       ptr("apple-user@example.com"),
+		}).Return(domain.OAuthTokenCallbackResult{
+			User:      u,
+			TokenPair: pair,
+		}, nil)
+
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, oauthCallback)
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/native/apple/callback", map[string]any{
+			"identity_token": "apple-identity-token",
+			"full_name":      "Ivan Ivanov",
+			"email":          "apple-user@example.com",
+		})
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("apple callback missing identity_token => 400", func(t *testing.T) {
+		h := NewAuthHandler(&mockRegister{}, &mockLogin{}, &mockRefresh{}, &mockLogout{}, &mockOAuthStart{}, &mockOAuthCallback{})
+		w := postJSON(t, setupAuthRouter(h), "/auth/oauth/native/apple/callback", map[string]any{
+			"full_name": "Ivan Ivanov",
+		})
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }
 

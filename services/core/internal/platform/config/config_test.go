@@ -128,6 +128,10 @@ func TestLoad_OAuthDefaults(t *testing.T) {
 	unsetenv(t, "OAUTH_YANDEX_TOKEN_URL")
 	unsetenv(t, "OAUTH_YANDEX_USER_INFO_URL")
 	unsetenv(t, "OAUTH_YANDEX_SCOPES")
+	unsetenv(t, "OAUTH_APPLE_CLIENT_ID")
+	unsetenv(t, "OAUTH_APPLE_JWKS_URL")
+	unsetenv(t, "OAUTH_APPLE_JWKS_CACHE_TTL")
+	unsetenv(t, "OAUTH_APPLE_ISSUER")
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
@@ -139,6 +143,10 @@ func TestLoad_OAuthDefaults(t *testing.T) {
 	assert.Equal(t, []string{"openid", "email", "profile"}, cfg.OAuth.Google.Scopes)
 	assert.False(t, cfg.OAuth.Google.Enabled)
 	assert.False(t, cfg.OAuth.Yandex.Enabled)
+	assert.False(t, cfg.OAuth.AppleNative.Enabled)
+	assert.Equal(t, "https://appleid.apple.com/auth/keys", cfg.OAuth.AppleNative.JWKSURL)
+	assert.Equal(t, time.Hour, cfg.OAuth.AppleNative.JWKSCacheTTL)
+	assert.Equal(t, "https://appleid.apple.com", cfg.OAuth.AppleNative.Issuer)
 }
 
 func TestLoad_OAuthCustomValues(t *testing.T) {
@@ -153,6 +161,10 @@ func TestLoad_OAuthCustomValues(t *testing.T) {
 	setenv(t, "OAUTH_YANDEX_CLIENT_ID", "yandex-client-id")
 	setenv(t, "OAUTH_YANDEX_CLIENT_SECRET", "yandex-client-secret")
 	setenv(t, "OAUTH_YANDEX_NATIVE_SDK_ENABLED", "true")
+	setenv(t, "OAUTH_APPLE_CLIENT_ID", "me.foodSea")
+	setenv(t, "OAUTH_APPLE_JWKS_URL", "https://apple.example.test/keys")
+	setenv(t, "OAUTH_APPLE_JWKS_CACHE_TTL", "30m")
+	setenv(t, "OAUTH_APPLE_ISSUER", "https://apple.example.test")
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
@@ -171,6 +183,11 @@ func TestLoad_OAuthCustomValues(t *testing.T) {
 	assert.Equal(t, "yandex-client-id", cfg.OAuth.Yandex.ClientID)
 	assert.Equal(t, "yandex-client-secret", cfg.OAuth.Yandex.ClientSecret)
 	assert.True(t, cfg.OAuth.YandexNativeSDKEnabled)
+	assert.True(t, cfg.OAuth.AppleNative.Enabled)
+	assert.Equal(t, "me.foodSea", cfg.OAuth.AppleNative.ClientID)
+	assert.Equal(t, "https://apple.example.test/keys", cfg.OAuth.AppleNative.JWKSURL)
+	assert.Equal(t, 30*time.Minute, cfg.OAuth.AppleNative.JWKSCacheTTL)
+	assert.Equal(t, "https://apple.example.test", cfg.OAuth.AppleNative.Issuer)
 }
 
 func TestLoad_ProdOAuthPartialCredentials(t *testing.T) {
@@ -202,6 +219,19 @@ func TestLoad_ProdNativeOAuthWithoutNativeRedirectURIs(t *testing.T) {
 	setenv(t, "JWT_SECRET", "supersecret")
 	setenv(t, "OAUTH_NATIVE_ENABLED", "true")
 	setenv(t, "OAUTH_GOOGLE_NATIVE_CLIENT_ID", "google-native-client-id")
+	unsetenv(t, "OAUTH_NATIVE_ALLOWED_REDIRECT_URIS")
+	setenv(t, "OAUTH_ALLOWED_REDIRECT_URIS", "foodsea://legacy/callback")
+
+	_, err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "OAUTH_NATIVE_ALLOWED_REDIRECT_URIS")
+}
+
+func TestLoad_ProdNativeOAuthAppleWithoutNativeRedirectURIs(t *testing.T) {
+	setenv(t, "ENV", "production")
+	setenv(t, "JWT_SECRET", "supersecret")
+	setenv(t, "OAUTH_NATIVE_ENABLED", "true")
+	setenv(t, "OAUTH_APPLE_CLIENT_ID", "me.foodSea")
 	unsetenv(t, "OAUTH_NATIVE_ALLOWED_REDIRECT_URIS")
 	setenv(t, "OAUTH_ALLOWED_REDIRECT_URIS", "foodsea://legacy/callback")
 

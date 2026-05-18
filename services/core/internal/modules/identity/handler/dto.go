@@ -39,6 +39,21 @@ type OAuthNativeSDKCallbackRequest struct {
 	AccessToken string `json:"access_token" binding:"required"`
 }
 
+type OAuthNativeAppleCallbackRequest struct {
+	IdentityToken string  `json:"identity_token" binding:"required"`
+	FullName      *string `json:"full_name,omitempty"`
+	Email         *string `json:"email,omitempty" binding:"omitempty,email"`
+}
+
+type OAuthNativeCallbackRequest struct {
+	Code          string  `json:"code,omitempty"`
+	State         string  `json:"state,omitempty"`
+	RedirectURI   string  `json:"redirect_uri,omitempty"`
+	IdentityToken string  `json:"identity_token,omitempty"`
+	FullName      *string `json:"full_name,omitempty"`
+	Email         *string `json:"email,omitempty"`
+}
+
 type UserResponse struct {
 	ID             uuid.UUID `json:"id"`
 	Phone          *string   `json:"phone,omitempty"`

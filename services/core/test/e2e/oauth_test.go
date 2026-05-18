@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,6 +119,85 @@ func TestOAuthE2E(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	})
+
+	t.Run("apple_native_callback_happy_path", func(t *testing.T) {
+		email := "apple-new@foodsea.test"
+		token := signAppleIdentityToken(
+			"apple-sub-new",
+			testAppleClientID,
+			testAppleIssuer,
+			&email,
+			time.Now().Add(5*time.Minute),
+			time.Now(),
+		)
+
+		resp, err := postJSON(testBaseURL+"/api/v1/auth/oauth/native/apple/callback", map[string]string{
+			"identity_token": token,
+			"email":          email,
+			"full_name":      "Apple User",
+		})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var auth registerResp
+		require.NoError(t, decodeJSON(resp, &auth))
+		require.NotEmpty(t, auth.Data.Access)
+		require.NotEmpty(t, auth.Data.Refresh)
+	})
+
+	t.Run("apple_native_callback_malformed_token_unauthorized", func(t *testing.T) {
+		resp, err := postJSON(testBaseURL+"/api/v1/auth/oauth/native/apple/callback", map[string]string{
+			"identity_token": "not-a-jwt",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		resp.Body.Close()
+	})
+
+	t.Run("apple_native_callback_wrong_audience_unauthorized", func(t *testing.T) {
+		token := signAppleIdentityToken(
+			"apple-sub-bad-aud",
+			"wrong-client",
+			testAppleIssuer,
+			nil,
+			time.Now().Add(5*time.Minute),
+			time.Now(),
+		)
+		resp, err := postJSON(testBaseURL+"/api/v1/auth/oauth/native/apple/callback", map[string]string{
+			"identity_token": token,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		resp.Body.Close()
+	})
+
+	t.Run("apple_native_callback_email_conflict", func(t *testing.T) {
+		email := "apple-conflict@foodsea.test"
+		password := "SuperSecret1!"
+
+		resp, err := postJSON(testBaseURL+"/api/v1/auth/register", map[string]string{
+			"email":    email,
+			"password": password,
+		})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		token := signAppleIdentityToken(
+			"apple-sub-conflict",
+			testAppleClientID,
+			testAppleIssuer,
+			&email,
+			time.Now().Add(5*time.Minute),
+			time.Now(),
+		)
+		resp, err = postJSON(testBaseURL+"/api/v1/auth/oauth/native/apple/callback", map[string]string{
+			"identity_token": token,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
 		resp.Body.Close()
 	})
 }

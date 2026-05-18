@@ -268,6 +268,21 @@ definitions:
     - redirect_uri
     - state
     type: object
+  internal_modules_identity_handler.OAuthNativeCallbackRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      identity_token:
+        type: string
+      redirect_uri:
+        type: string
+      state:
+        type: string
+    type: object
   internal_modules_identity_handler.OAuthNativeSDKCallbackRequest:
     properties:
       access_token:
@@ -589,12 +604,13 @@ paths:
         name: provider
         required: true
         type: string
-      - description: OAuth callback payload
+      - description: 'Native OAuth callback payload (google: code/state/redirect_uri,
+          apple: identity_token + optional full_name/email)'
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_modules_identity_handler.OAuthCallbackRequest'
+          $ref: '#/definitions/internal_modules_identity_handler.OAuthNativeCallbackRequest'
       produces:
       - application/json
       responses:

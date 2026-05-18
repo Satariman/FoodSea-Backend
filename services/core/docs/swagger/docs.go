@@ -448,12 +448,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "OAuth callback payload",
+                        "description": "Native OAuth callback payload (google: code/state/redirect_uri, apple: identity_token + optional full_name/email)",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthCallbackRequest"
+                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthNativeCallbackRequest"
                         }
                     }
                 ],
@@ -2209,6 +2209,29 @@ const docTemplate = `{
             ],
             "properties": {
                 "code": {
+                    "type": "string"
+                },
+                "redirect_uri": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_handler.OAuthNativeCallbackRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "identity_token": {
                     "type": "string"
                 },
                 "redirect_uri": {

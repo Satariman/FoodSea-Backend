@@ -81,6 +81,8 @@ type OAuthCallbackResult struct {
 type OAuthTokenCallbackRequest struct {
 	Provider    OAuthProviderKind
 	AccessToken string
+	FullName    *string
+	Email       *string
 }
 
 type OAuthTokenCallbackResult struct {

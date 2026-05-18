@@ -5,6 +5,9 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -20,6 +23,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	dockercontainer "github.com/moby/moby/api/types/container"
 	dockernetwork "github.com/moby/moby/api/types/network"
 	skafka "github.com/segmentio/kafka-go"
@@ -57,11 +61,15 @@ var (
 	seededProductID      string
 	seededProductBarcode = "4607025390015"
 	seededStoreID        string
+	testAppleSigningKey  *ecdsa.PrivateKey
 )
 
 const (
 	testGoogleRedirectURI = "foodsea://oauth/google/callback"
 	testYandexRedirectURI = "foodsea://oauth/yandex/callback"
+	testAppleClientID     = "me.foodSea"
+	testAppleIssuer       = "https://appleid.apple.com"
+	testAppleKID          = "apple-kid-e2e"
 )
 
 type fakeMLClient struct {
@@ -240,6 +248,13 @@ func run(ctx context.Context, m *testing.M) int {
 				AuthURL:     testOAuthServer.URL + "/google/auth",
 				TokenURL:    testOAuthServer.URL + "/google/token",
 				UserInfoURL: testOAuthServer.URL + "/google/userinfo",
+			},
+			AppleNative: config.OAuthAppleConfig{
+				Enabled:      true,
+				ClientID:     testAppleClientID,
+				JWKSURL:      testOAuthServer.URL + "/apple/keys",
+				JWKSCacheTTL: time.Hour,
+				Issuer:       testAppleIssuer,
 			},
 			Yandex: config.OAuthProviderConfig{
 				Enabled:      true,
@@ -507,6 +522,12 @@ func decodeJSON(resp *http.Response, dst any) error {
 }
 
 func newOAuthFakeServer() *httptest.Server {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	testAppleSigningKey = key
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/google/token", func(w http.ResponseWriter, r *http.Request) {
@@ -586,6 +607,25 @@ func newOAuthFakeServer() *httptest.Server {
 		}
 	})
 
+	mux.HandleFunc("/apple/keys", func(w http.ResponseWriter, _ *http.Request) {
+		x := base64.RawURLEncoding.EncodeToString(testAppleSigningKey.PublicKey.X.Bytes())
+		y := base64.RawURLEncoding.EncodeToString(testAppleSigningKey.PublicKey.Y.Bytes())
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"keys": []map[string]any{
+				{
+					"kty": "EC",
+					"kid": testAppleKID,
+					"use": "sig",
+					"alg": "ES256",
+					"crv": "P-256",
+					"x":   x,
+					"y":   y,
+				},
+			},
+		})
+	})
+
 	return httptest.NewServer(mux)
 }
 
@@ -594,4 +634,26 @@ func fakeUnsignedJWT(claims map[string]any) string {
 	headerJSON, _ := json.Marshal(header)
 	claimsJSON, _ := json.Marshal(claims)
 	return base64.RawURLEncoding.EncodeToString(headerJSON) + "." + base64.RawURLEncoding.EncodeToString(claimsJSON) + "."
+}
+
+func signAppleIdentityToken(sub, aud, iss string, email *string, exp, iat time.Time) string {
+	claims := jwt.MapClaims{
+		"sub": sub,
+		"aud": aud,
+		"iss": iss,
+		"exp": exp.Unix(),
+		"iat": iat.Unix(),
+	}
+	if email != nil {
+		claims["email"] = *email
+		claims["email_verified"] = true
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	token.Header["kid"] = testAppleKID
+	signed, err := token.SignedString(testAppleSigningKey)
+	if err != nil {
+		panic(err)
+	}
+	return signed
 }

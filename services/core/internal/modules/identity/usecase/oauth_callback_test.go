@@ -629,4 +629,88 @@ func TestOAuthCallback_ExecuteToken(t *testing.T) {
 		_, err := uc.ExecuteToken(ctx, domain.OAuthTokenCallbackRequest{})
 		assert.ErrorIs(t, err, sherrors.ErrInvalidInput)
 	})
+
+	t.Run("apple token callback existing identity success", func(t *testing.T) {
+		provider := new(MockOAuthProvider)
+		provider.On("Name").Return(domain.OAuthProviderApple).Once()
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := usecase.NewOAuthCallback(new(MockOAuthStateStore), []domain.OAuthProvider{provider}, identities, users, tokens)
+
+		userID := uuid.New()
+		u := &domain.User{ID: userID, Email: ptr("apple@foodsea.test")}
+		pair := fakePair()
+		provider.On("ProfileFromToken", ctx, "apple-token").Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderApple,
+			ProviderUserID: "apple-sub-1",
+			Email:          ptr("apple@foodsea.test"),
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderApple, "apple-sub-1").Return(&domain.OAuthIdentity{
+			UserID: userID,
+		}, nil).Once()
+		users.On("GetByID", ctx, userID).Return(u, nil).Once()
+		tokens.On("IssuePair", ctx, userID).Return(pair, nil).Once()
+
+		_, err := uc.ExecuteToken(ctx, domain.OAuthTokenCallbackRequest{
+			Provider:    domain.OAuthProviderApple,
+			AccessToken: "apple-token",
+			Email:       ptr("ignored@foodsea.test"),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("apple token callback email conflict returns conflict", func(t *testing.T) {
+		provider := new(MockOAuthProvider)
+		provider.On("Name").Return(domain.OAuthProviderApple).Once()
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := usecase.NewOAuthCallback(new(MockOAuthStateStore), []domain.OAuthProvider{provider}, identities, users, tokens)
+
+		email := "existing@foodsea.test"
+		existingUser := &domain.User{ID: uuid.New(), Email: &email}
+		provider.On("ProfileFromToken", ctx, "apple-token").Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderApple,
+			ProviderUserID: "apple-sub-2",
+			Email:          &email,
+			EmailVerified:  true,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderApple, "apple-sub-2").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("GetByEmail", ctx, email).Return(existingUser, nil).Once()
+
+		_, err := uc.ExecuteToken(ctx, domain.OAuthTokenCallbackRequest{
+			Provider:    domain.OAuthProviderApple,
+			AccessToken: "apple-token",
+		})
+		assert.ErrorIs(t, err, sherrors.ErrConflict)
+	})
+
+	t.Run("apple token callback creates user when email absent", func(t *testing.T) {
+		provider := new(MockOAuthProvider)
+		provider.On("Name").Return(domain.OAuthProviderApple).Once()
+		identities := new(MockOAuthIdentityRepository)
+		users := new(MockUserRepository)
+		tokens := new(MockTokenService)
+		uc := usecase.NewOAuthCallback(new(MockOAuthStateStore), []domain.OAuthProvider{provider}, identities, users, tokens)
+
+		pair := fakePair()
+		provider.On("ProfileFromToken", ctx, "apple-token").Return(domain.OAuthProviderProfile{
+			Provider:       domain.OAuthProviderApple,
+			ProviderUserID: "apple-sub-3",
+			Email:          nil,
+			EmailVerified:  false,
+		}, nil).Once()
+		identities.On("GetByProviderUserID", ctx, domain.OAuthProviderApple, "apple-sub-3").Return(nil, sherrors.ErrNotFound).Once()
+		users.On("CreateOAuth", ctx, mock.AnythingOfType("*domain.User")).Return(nil).Once()
+		identities.On("Create", ctx, mock.AnythingOfType("*domain.OAuthIdentity")).Return(nil).Once()
+		tokens.On("IssuePair", ctx, mock.AnythingOfType("uuid.UUID")).Return(pair, nil).Once()
+
+		_, err := uc.ExecuteToken(ctx, domain.OAuthTokenCallbackRequest{
+			Provider:    domain.OAuthProviderApple,
+			AccessToken: "apple-token",
+		})
+		require.NoError(t, err)
+	})
 }

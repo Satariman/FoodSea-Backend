@@ -89,6 +89,7 @@ type OAuthConfig struct {
 	NativeEnabled             bool
 	Google                    OAuthProviderConfig
 	GoogleNative              OAuthProviderConfig
+	AppleNative               OAuthAppleConfig
 	Yandex                    OAuthProviderConfig
 	YandexNativeSDKEnabled    bool
 }
@@ -101,6 +102,14 @@ type OAuthProviderConfig struct {
 	TokenURL     string
 	UserInfoURL  string
 	Scopes       []string
+}
+
+type OAuthAppleConfig struct {
+	Enabled      bool
+	ClientID     string
+	JWKSURL      string
+	JWKSCacheTTL time.Duration
+	Issuer       string
 }
 
 type APNSConfig struct {
@@ -226,6 +235,11 @@ func Load() (*Config, error) {
 				UserInfoURL: "https://openidconnect.googleapis.com/v1/userinfo",
 				Scopes:      []string{"openid", "email", "profile"},
 			}),
+			AppleNative: oauthAppleConfig(OAuthAppleConfig{
+				JWKSURL:      "https://appleid.apple.com/auth/keys",
+				JWKSCacheTTL: time.Hour,
+				Issuer:       "https://appleid.apple.com",
+			}),
 			Yandex: oauthProviderConfig("YANDEX", OAuthProviderConfig{
 				AuthURL:     "https://oauth.yandex.ru/authorize",
 				TokenURL:    "https://oauth.yandex.ru/token",
@@ -255,7 +269,7 @@ func Load() (*Config, error) {
 	if env == "production" && cfg.OAuth.LegacyEnabled && (cfg.OAuth.Google.Enabled || cfg.OAuth.Yandex.Enabled) && len(cfg.OAuth.AllowedRedirectURIs) == 0 {
 		return nil, fmt.Errorf("OAUTH_ALLOWED_REDIRECT_URIS must be set in production when OAuth is enabled")
 	}
-	if env == "production" && cfg.OAuth.NativeEnabled && (cfg.OAuth.GoogleNative.Enabled || cfg.OAuth.YandexNativeSDKEnabled) && len(cfg.OAuth.NativeAllowedRedirectURIs) == 0 {
+	if env == "production" && cfg.OAuth.NativeEnabled && (cfg.OAuth.GoogleNative.Enabled || cfg.OAuth.AppleNative.Enabled || cfg.OAuth.YandexNativeSDKEnabled) && len(cfg.OAuth.NativeAllowedRedirectURIs) == 0 {
 		return nil, fmt.Errorf("OAUTH_NATIVE_ALLOWED_REDIRECT_URIS must be set in production when native OAuth is enabled")
 	}
 
@@ -290,6 +304,19 @@ func oauthPublicProviderConfig(provider string, defaults OAuthProviderConfig) OA
 	cfg.TokenURL = getEnv("OAUTH_"+provider+"_TOKEN_URL", defaults.TokenURL)
 	cfg.UserInfoURL = getEnv("OAUTH_"+provider+"_USER_INFO_URL", defaults.UserInfoURL)
 	cfg.Scopes = getEnvStrings("OAUTH_"+provider+"_SCOPES", defaults.Scopes)
+
+	return cfg
+}
+
+func oauthAppleConfig(defaults OAuthAppleConfig) OAuthAppleConfig {
+	clientID := getEnv("OAUTH_APPLE_CLIENT_ID", "")
+
+	cfg := defaults
+	cfg.ClientID = clientID
+	cfg.Enabled = clientID != ""
+	cfg.JWKSURL = getEnv("OAUTH_APPLE_JWKS_URL", defaults.JWKSURL)
+	cfg.JWKSCacheTTL = getEnvDuration("OAUTH_APPLE_JWKS_CACHE_TTL", defaults.JWKSCacheTTL)
+	cfg.Issuer = getEnv("OAUTH_APPLE_ISSUER", defaults.Issuer)
 
 	return cfg
 }
