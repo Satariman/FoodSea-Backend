@@ -214,7 +214,7 @@ const docTemplate = `{
         },
         "/auth/oauth/native/{provider}/callback": {
             "post": {
-                "description": "Exchanges OAuth code from native client and returns auth tokens",
+                "description": "Apple native callback contract. For provider=apple send identity_token (required), optional full_name/email. Runtime for google/yandex native callback stays code/state/redirect_uri.",
                 "consumes": [
                     "application/json"
                 ],
@@ -234,12 +234,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Native OAuth callback payload (google/yandex: code,state,redirect_uri; apple: identity_token with optional full_name,email)",
+                        "description": "Apple native callback payload",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthNativeCallbackRequest"
+                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthNativeAppleCallbackRequest"
                         }
                     }
                 ],
@@ -2219,12 +2219,12 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_modules_identity_handler.OAuthNativeCallbackRequest": {
+        "internal_modules_identity_handler.OAuthNativeAppleCallbackRequest": {
             "type": "object",
+            "required": [
+                "identity_token"
+            ],
             "properties": {
-                "code": {
-                    "type": "string"
-                },
                 "email": {
                     "type": "string"
                 },
@@ -2232,12 +2232,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "identity_token": {
-                    "type": "string"
-                },
-                "redirect_uri": {
-                    "type": "string"
-                },
-                "state": {
                     "type": "string"
                 }
             }

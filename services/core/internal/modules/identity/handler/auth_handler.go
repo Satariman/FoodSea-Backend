@@ -296,12 +296,12 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 
 // OAuthNativeCallback godoc
 // @Summary      Finish native OAuth flow
-// @Description  Exchanges OAuth code from native client and returns auth tokens
+// @Description  Apple native callback contract. For provider=apple send identity_token (required), optional full_name/email. Runtime for google/yandex native callback stays code/state/redirect_uri.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
 // @Param        provider path string true "OAuth provider"
-// @Param        body body OAuthNativeCallbackRequest true "Native OAuth callback payload (google/yandex: code,state,redirect_uri; apple: identity_token with optional full_name,email)"
+// @Param        body body OAuthNativeAppleCallbackRequest true "Apple native callback payload"
 // @Success      200 {object} httputil.Response{data=AuthResponse}
 // @Failure      400 {object} httputil.Response
 // @Failure      401 {object} httputil.Response
