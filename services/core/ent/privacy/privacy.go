@@ -279,6 +279,30 @@ func (f OfferMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation)
 	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.OfferMutation", m)
 }
 
+// The OrderLiveActivityQueryRuleFunc type is an adapter to allow the use of ordinary
+// functions as a query rule.
+type OrderLiveActivityQueryRuleFunc func(context.Context, *ent.OrderLiveActivityQuery) error
+
+// EvalQuery return f(ctx, q).
+func (f OrderLiveActivityQueryRuleFunc) EvalQuery(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.OrderLiveActivityQuery); ok {
+		return f(ctx, q)
+	}
+	return Denyf("ent/privacy: unexpected query type %T, expect *ent.OrderLiveActivityQuery", q)
+}
+
+// The OrderLiveActivityMutationRuleFunc type is an adapter to allow the use of ordinary
+// functions as a mutation rule.
+type OrderLiveActivityMutationRuleFunc func(context.Context, *ent.OrderLiveActivityMutation) error
+
+// EvalMutation calls f(ctx, m).
+func (f OrderLiveActivityMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation) error {
+	if m, ok := m.(*ent.OrderLiveActivityMutation); ok {
+		return f(ctx, m)
+	}
+	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.OrderLiveActivityMutation", m)
+}
+
 // The ProductQueryRuleFunc type is an adapter to allow the use of ordinary
 // functions as a query rule.
 type ProductQueryRuleFunc func(context.Context, *ent.ProductQuery) error
@@ -375,6 +399,30 @@ func (f UserMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation) 
 	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.UserMutation", m)
 }
 
+// The UserDeviceQueryRuleFunc type is an adapter to allow the use of ordinary
+// functions as a query rule.
+type UserDeviceQueryRuleFunc func(context.Context, *ent.UserDeviceQuery) error
+
+// EvalQuery return f(ctx, q).
+func (f UserDeviceQueryRuleFunc) EvalQuery(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.UserDeviceQuery); ok {
+		return f(ctx, q)
+	}
+	return Denyf("ent/privacy: unexpected query type %T, expect *ent.UserDeviceQuery", q)
+}
+
+// The UserDeviceMutationRuleFunc type is an adapter to allow the use of ordinary
+// functions as a mutation rule.
+type UserDeviceMutationRuleFunc func(context.Context, *ent.UserDeviceMutation) error
+
+// EvalMutation calls f(ctx, m).
+func (f UserDeviceMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation) error {
+	if m, ok := m.(*ent.UserDeviceMutation); ok {
+		return f(ctx, m)
+	}
+	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.UserDeviceMutation", m)
+}
+
 type (
 	// Filter is the interface that wraps the Where function
 	// for filtering nodes in queries and mutations.
@@ -424,6 +472,8 @@ func queryFilter(q ent.Query) (Filter, error) {
 		return q.Filter(), nil
 	case *ent.OfferQuery:
 		return q.Filter(), nil
+	case *ent.OrderLiveActivityQuery:
+		return q.Filter(), nil
 	case *ent.ProductQuery:
 		return q.Filter(), nil
 	case *ent.ProductNutritionQuery:
@@ -431,6 +481,8 @@ func queryFilter(q ent.Query) (Filter, error) {
 	case *ent.StoreQuery:
 		return q.Filter(), nil
 	case *ent.UserQuery:
+		return q.Filter(), nil
+	case *ent.UserDeviceQuery:
 		return q.Filter(), nil
 	default:
 		return nil, Denyf("ent/privacy: unexpected query type %T for query filter", q)
@@ -453,6 +505,8 @@ func mutationFilter(m ent.Mutation) (Filter, error) {
 		return m.Filter(), nil
 	case *ent.OfferMutation:
 		return m.Filter(), nil
+	case *ent.OrderLiveActivityMutation:
+		return m.Filter(), nil
 	case *ent.ProductMutation:
 		return m.Filter(), nil
 	case *ent.ProductNutritionMutation:
@@ -460,6 +514,8 @@ func mutationFilter(m ent.Mutation) (Filter, error) {
 	case *ent.StoreMutation:
 		return m.Filter(), nil
 	case *ent.UserMutation:
+		return m.Filter(), nil
+	case *ent.UserDeviceMutation:
 		return m.Filter(), nil
 	default:
 		return nil, Denyf("ent/privacy: unexpected mutation type %T for mutation filter", m)

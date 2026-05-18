@@ -95,6 +95,23 @@ func TestLoad_KafkaBrokers(t *testing.T) {
 	assert.Equal(t, []string{"broker1:9092", "broker2:9092"}, cfg.Kafka.Brokers)
 }
 
+func TestLoad_NotificationsKafkaConfig(t *testing.T) {
+	unsetenv(t, "NOTIFICATIONS_KAFKA_TOPIC")
+	unsetenv(t, "NOTIFICATIONS_KAFKA_GROUP_ID")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	assert.Equal(t, "order.events", cfg.Notifications.Kafka.Topic)
+	assert.Equal(t, "core-notifications", cfg.Notifications.Kafka.GroupID)
+
+	setenv(t, "NOTIFICATIONS_KAFKA_TOPIC", "custom.order.events")
+	setenv(t, "NOTIFICATIONS_KAFKA_GROUP_ID", "custom-core-notifications")
+	cfg, err = config.Load()
+	require.NoError(t, err)
+	assert.Equal(t, "custom.order.events", cfg.Notifications.Kafka.Topic)
+	assert.Equal(t, "custom-core-notifications", cfg.Notifications.Kafka.GroupID)
+}
+
 func TestLoad_OAuthDefaults(t *testing.T) {
 	unsetenv(t, "ENV")
 	unsetenv(t, "OAUTH_STATE_TTL")
@@ -233,4 +250,29 @@ func TestLoad_InvalidPhotoSearchTimeoutConfig(t *testing.T) {
 	_, err := config.Load()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "PHOTO_SEARCH_TIMEOUT")
+}
+
+func TestLoad_APNSEnvironmentDefaults(t *testing.T) {
+	unsetenv(t, "ENV")
+	unsetenv(t, "APNS_ENV")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	assert.Equal(t, "sandbox", cfg.APNS.Environment)
+
+	setenv(t, "ENV", "production")
+	setenv(t, "JWT_SECRET", "supersecret")
+	unsetenv(t, "APNS_ENV")
+
+	cfg, err = config.Load()
+	require.NoError(t, err)
+	assert.Equal(t, "production", cfg.APNS.Environment)
+}
+
+func TestLoad_APNSInvalidEnvironment(t *testing.T) {
+	setenv(t, "APNS_ENV", "staging")
+
+	_, err := config.Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "APNS_ENV")
 }

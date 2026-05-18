@@ -93,6 +93,18 @@ func (f OfferFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OfferMutation", m)
 }
 
+// The OrderLiveActivityFunc type is an adapter to allow the use of ordinary
+// function as OrderLiveActivity mutator.
+type OrderLiveActivityFunc func(context.Context, *ent.OrderLiveActivityMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OrderLiveActivityFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OrderLiveActivityMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OrderLiveActivityMutation", m)
+}
+
 // The ProductFunc type is an adapter to allow the use of ordinary
 // function as Product mutator.
 type ProductFunc func(context.Context, *ent.ProductMutation) (ent.Value, error)
@@ -139,6 +151,18 @@ func (f UserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserMutation", m)
+}
+
+// The UserDeviceFunc type is an adapter to allow the use of ordinary
+// function as UserDevice mutator.
+type UserDeviceFunc func(context.Context, *ent.UserDeviceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UserDeviceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UserDeviceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserDeviceMutation", m)
 }
 
 // Condition is a hook condition function.

@@ -19,10 +19,12 @@ import (
 	"github.com/foodsea/core/ent/deliverycondition"
 	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
+	"github.com/foodsea/core/ent/orderliveactivity"
 	"github.com/foodsea/core/ent/product"
 	"github.com/foodsea/core/ent/productnutrition"
 	"github.com/foodsea/core/ent/store"
 	"github.com/foodsea/core/ent/user"
+	"github.com/foodsea/core/ent/userdevice"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -90,10 +92,12 @@ func checkColumn(t, c string) error {
 			deliverycondition.Table: deliverycondition.ValidColumn,
 			oauthidentity.Table:     oauthidentity.ValidColumn,
 			offer.Table:             offer.ValidColumn,
+			orderliveactivity.Table: orderliveactivity.ValidColumn,
 			product.Table:           product.ValidColumn,
 			productnutrition.Table:  productnutrition.ValidColumn,
 			store.Table:             store.ValidColumn,
 			user.Table:              user.ValidColumn,
+			userdevice.Table:        userdevice.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

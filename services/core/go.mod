@@ -86,6 +86,7 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/hashicorp/hcl/v2 v2.18.1 // indirect
@@ -121,6 +122,7 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
+	github.com/sideshow/apns2 v0.25.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect

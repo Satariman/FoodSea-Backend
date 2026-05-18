@@ -10,17 +10,19 @@ import (
 
 // Config holds the full runtime configuration for core-service.
 type Config struct {
-	Env    string
-	Server ServerConfig
-	GRPC   GRPCConfig
-	ML     MLConfig
-	PhotoSearch PhotoSearchConfig
-	DB     DatabaseConfig
-	Redis  RedisConfig
-	Kafka  KafkaConfig
-	JWT    JWTConfig
-	S3     S3Config
-	OAuth  OAuthConfig
+	Env           string
+	Server        ServerConfig
+	GRPC          GRPCConfig
+	ML            MLConfig
+	PhotoSearch   PhotoSearchConfig
+	DB            DatabaseConfig
+	Redis         RedisConfig
+	Kafka         KafkaConfig
+	Notifications NotificationsConfig
+	JWT           JWTConfig
+	S3            S3Config
+	OAuth         OAuthConfig
+	APNS          APNSConfig
 }
 
 type MLConfig struct {
@@ -64,6 +66,15 @@ type KafkaConfig struct {
 	Brokers []string
 }
 
+type NotificationsConfig struct {
+	Kafka NotificationsKafkaConfig
+}
+
+type NotificationsKafkaConfig struct {
+	Topic   string
+	GroupID string
+}
+
 type JWTConfig struct {
 	Secret     string
 	AccessTTL  time.Duration
@@ -90,6 +101,14 @@ type OAuthProviderConfig struct {
 	TokenURL     string
 	UserInfoURL  string
 	Scopes       []string
+}
+
+type APNSConfig struct {
+	Environment string
+	BundleID    string
+	TeamID      string
+	KeyID       string
+	PrivateKey  string
 }
 
 // Load reads configuration from environment variables and validates it.
@@ -131,6 +150,17 @@ func Load() (*Config, error) {
 	if env == "production" && os.Getenv("JWT_SECRET") == "" {
 		return nil, fmt.Errorf("JWT_SECRET must be set in production")
 	}
+	apnsEnv := strings.ToLower(getEnv("APNS_ENV", ""))
+	if apnsEnv == "" {
+		if env == "production" {
+			apnsEnv = "production"
+		} else {
+			apnsEnv = "sandbox"
+		}
+	}
+	if apnsEnv != "sandbox" && apnsEnv != "production" {
+		return nil, fmt.Errorf("APNS_ENV must be one of: sandbox, production")
+	}
 
 	cfg := &Config{
 		Env: env,
@@ -158,6 +188,12 @@ func Load() (*Config, error) {
 		},
 		Kafka: KafkaConfig{
 			Brokers: getEnvStrings("KAFKA_BROKERS", []string{"localhost:9092"}),
+		},
+		Notifications: NotificationsConfig{
+			Kafka: NotificationsKafkaConfig{
+				Topic:   getEnv("NOTIFICATIONS_KAFKA_TOPIC", "order.events"),
+				GroupID: getEnv("NOTIFICATIONS_KAFKA_GROUP_ID", "core-notifications"),
+			},
 		},
 		JWT: JWTConfig{
 			Secret:     jwtSecret,
@@ -197,6 +233,13 @@ func Load() (*Config, error) {
 				Scopes:      []string{"login:email", "login:avatar"},
 			}),
 			YandexNativeSDKEnabled: getEnvBool("OAUTH_YANDEX_NATIVE_SDK_ENABLED", false),
+		},
+		APNS: APNSConfig{
+			Environment: apnsEnv,
+			BundleID:    getEnv("APNS_BUNDLE_ID", ""),
+			TeamID:      getEnv("APNS_TEAM_ID", ""),
+			KeyID:       getEnv("APNS_KEY_ID", ""),
+			PrivateKey:  getEnv("APNS_PRIVATE_KEY", ""),
 		},
 	}
 

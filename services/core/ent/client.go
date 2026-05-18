@@ -23,10 +23,12 @@ import (
 	"github.com/foodsea/core/ent/deliverycondition"
 	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
+	"github.com/foodsea/core/ent/orderliveactivity"
 	"github.com/foodsea/core/ent/product"
 	"github.com/foodsea/core/ent/productnutrition"
 	"github.com/foodsea/core/ent/store"
 	"github.com/foodsea/core/ent/user"
+	"github.com/foodsea/core/ent/userdevice"
 )
 
 // Client is the client that holds all ent builders.
@@ -48,6 +50,8 @@ type Client struct {
 	OAuthIdentity *OAuthIdentityClient
 	// Offer is the client for interacting with the Offer builders.
 	Offer *OfferClient
+	// OrderLiveActivity is the client for interacting with the OrderLiveActivity builders.
+	OrderLiveActivity *OrderLiveActivityClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductNutrition is the client for interacting with the ProductNutrition builders.
@@ -56,6 +60,8 @@ type Client struct {
 	Store *StoreClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// UserDevice is the client for interacting with the UserDevice builders.
+	UserDevice *UserDeviceClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -74,10 +80,12 @@ func (c *Client) init() {
 	c.DeliveryCondition = NewDeliveryConditionClient(c.config)
 	c.OAuthIdentity = NewOAuthIdentityClient(c.config)
 	c.Offer = NewOfferClient(c.config)
+	c.OrderLiveActivity = NewOrderLiveActivityClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.ProductNutrition = NewProductNutritionClient(c.config)
 	c.Store = NewStoreClient(c.config)
 	c.User = NewUserClient(c.config)
+	c.UserDevice = NewUserDeviceClient(c.config)
 }
 
 type (
@@ -177,10 +185,12 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DeliveryCondition: NewDeliveryConditionClient(cfg),
 		OAuthIdentity:     NewOAuthIdentityClient(cfg),
 		Offer:             NewOfferClient(cfg),
+		OrderLiveActivity: NewOrderLiveActivityClient(cfg),
 		Product:           NewProductClient(cfg),
 		ProductNutrition:  NewProductNutritionClient(cfg),
 		Store:             NewStoreClient(cfg),
 		User:              NewUserClient(cfg),
+		UserDevice:        NewUserDeviceClient(cfg),
 	}, nil
 }
 
@@ -207,10 +217,12 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DeliveryCondition: NewDeliveryConditionClient(cfg),
 		OAuthIdentity:     NewOAuthIdentityClient(cfg),
 		Offer:             NewOfferClient(cfg),
+		OrderLiveActivity: NewOrderLiveActivityClient(cfg),
 		Product:           NewProductClient(cfg),
 		ProductNutrition:  NewProductNutritionClient(cfg),
 		Store:             NewStoreClient(cfg),
 		User:              NewUserClient(cfg),
+		UserDevice:        NewUserDeviceClient(cfg),
 	}, nil
 }
 
@@ -241,7 +253,8 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.Brand, c.Cart, c.CartItem, c.Category, c.DeliveryCondition, c.OAuthIdentity,
-		c.Offer, c.Product, c.ProductNutrition, c.Store, c.User,
+		c.Offer, c.OrderLiveActivity, c.Product, c.ProductNutrition, c.Store, c.User,
+		c.UserDevice,
 	} {
 		n.Use(hooks...)
 	}
@@ -252,7 +265,8 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.Brand, c.Cart, c.CartItem, c.Category, c.DeliveryCondition, c.OAuthIdentity,
-		c.Offer, c.Product, c.ProductNutrition, c.Store, c.User,
+		c.Offer, c.OrderLiveActivity, c.Product, c.ProductNutrition, c.Store, c.User,
+		c.UserDevice,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -275,6 +289,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.OAuthIdentity.mutate(ctx, m)
 	case *OfferMutation:
 		return c.Offer.mutate(ctx, m)
+	case *OrderLiveActivityMutation:
+		return c.OrderLiveActivity.mutate(ctx, m)
 	case *ProductMutation:
 		return c.Product.mutate(ctx, m)
 	case *ProductNutritionMutation:
@@ -283,6 +299,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Store.mutate(ctx, m)
 	case *UserMutation:
 		return c.User.mutate(ctx, m)
+	case *UserDeviceMutation:
+		return c.UserDevice.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -1429,6 +1447,155 @@ func (c *OfferClient) mutate(ctx context.Context, m *OfferMutation) (Value, erro
 	}
 }
 
+// OrderLiveActivityClient is a client for the OrderLiveActivity schema.
+type OrderLiveActivityClient struct {
+	config
+}
+
+// NewOrderLiveActivityClient returns a client for the OrderLiveActivity from the given config.
+func NewOrderLiveActivityClient(c config) *OrderLiveActivityClient {
+	return &OrderLiveActivityClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `orderliveactivity.Hooks(f(g(h())))`.
+func (c *OrderLiveActivityClient) Use(hooks ...Hook) {
+	c.hooks.OrderLiveActivity = append(c.hooks.OrderLiveActivity, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `orderliveactivity.Intercept(f(g(h())))`.
+func (c *OrderLiveActivityClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OrderLiveActivity = append(c.inters.OrderLiveActivity, interceptors...)
+}
+
+// Create returns a builder for creating a OrderLiveActivity entity.
+func (c *OrderLiveActivityClient) Create() *OrderLiveActivityCreate {
+	mutation := newOrderLiveActivityMutation(c.config, OpCreate)
+	return &OrderLiveActivityCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OrderLiveActivity entities.
+func (c *OrderLiveActivityClient) CreateBulk(builders ...*OrderLiveActivityCreate) *OrderLiveActivityCreateBulk {
+	return &OrderLiveActivityCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OrderLiveActivityClient) MapCreateBulk(slice any, setFunc func(*OrderLiveActivityCreate, int)) *OrderLiveActivityCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OrderLiveActivityCreateBulk{err: fmt.Errorf("calling to OrderLiveActivityClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OrderLiveActivityCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OrderLiveActivityCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OrderLiveActivity.
+func (c *OrderLiveActivityClient) Update() *OrderLiveActivityUpdate {
+	mutation := newOrderLiveActivityMutation(c.config, OpUpdate)
+	return &OrderLiveActivityUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OrderLiveActivityClient) UpdateOne(_m *OrderLiveActivity) *OrderLiveActivityUpdateOne {
+	mutation := newOrderLiveActivityMutation(c.config, OpUpdateOne, withOrderLiveActivity(_m))
+	return &OrderLiveActivityUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OrderLiveActivityClient) UpdateOneID(id uuid.UUID) *OrderLiveActivityUpdateOne {
+	mutation := newOrderLiveActivityMutation(c.config, OpUpdateOne, withOrderLiveActivityID(id))
+	return &OrderLiveActivityUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OrderLiveActivity.
+func (c *OrderLiveActivityClient) Delete() *OrderLiveActivityDelete {
+	mutation := newOrderLiveActivityMutation(c.config, OpDelete)
+	return &OrderLiveActivityDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OrderLiveActivityClient) DeleteOne(_m *OrderLiveActivity) *OrderLiveActivityDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OrderLiveActivityClient) DeleteOneID(id uuid.UUID) *OrderLiveActivityDeleteOne {
+	builder := c.Delete().Where(orderliveactivity.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OrderLiveActivityDeleteOne{builder}
+}
+
+// Query returns a query builder for OrderLiveActivity.
+func (c *OrderLiveActivityClient) Query() *OrderLiveActivityQuery {
+	return &OrderLiveActivityQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOrderLiveActivity},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OrderLiveActivity entity by its id.
+func (c *OrderLiveActivityClient) Get(ctx context.Context, id uuid.UUID) (*OrderLiveActivity, error) {
+	return c.Query().Where(orderliveactivity.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OrderLiveActivityClient) GetX(ctx context.Context, id uuid.UUID) *OrderLiveActivity {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a OrderLiveActivity.
+func (c *OrderLiveActivityClient) QueryUser(_m *OrderLiveActivity) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(orderliveactivity.Table, orderliveactivity.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, orderliveactivity.UserTable, orderliveactivity.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *OrderLiveActivityClient) Hooks() []Hook {
+	return c.hooks.OrderLiveActivity
+}
+
+// Interceptors returns the client interceptors.
+func (c *OrderLiveActivityClient) Interceptors() []Interceptor {
+	return c.inters.OrderLiveActivity
+}
+
+func (c *OrderLiveActivityClient) mutate(ctx context.Context, m *OrderLiveActivityMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OrderLiveActivityCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OrderLiveActivityUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OrderLiveActivityUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OrderLiveActivityDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OrderLiveActivity mutation op: %q", m.Op())
+	}
+}
+
 // ProductClient is a client for the Product schema.
 type ProductClient struct {
 	config
@@ -2139,14 +2306,166 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 	}
 }
 
+// UserDeviceClient is a client for the UserDevice schema.
+type UserDeviceClient struct {
+	config
+}
+
+// NewUserDeviceClient returns a client for the UserDevice from the given config.
+func NewUserDeviceClient(c config) *UserDeviceClient {
+	return &UserDeviceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `userdevice.Hooks(f(g(h())))`.
+func (c *UserDeviceClient) Use(hooks ...Hook) {
+	c.hooks.UserDevice = append(c.hooks.UserDevice, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `userdevice.Intercept(f(g(h())))`.
+func (c *UserDeviceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UserDevice = append(c.inters.UserDevice, interceptors...)
+}
+
+// Create returns a builder for creating a UserDevice entity.
+func (c *UserDeviceClient) Create() *UserDeviceCreate {
+	mutation := newUserDeviceMutation(c.config, OpCreate)
+	return &UserDeviceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of UserDevice entities.
+func (c *UserDeviceClient) CreateBulk(builders ...*UserDeviceCreate) *UserDeviceCreateBulk {
+	return &UserDeviceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UserDeviceClient) MapCreateBulk(slice any, setFunc func(*UserDeviceCreate, int)) *UserDeviceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UserDeviceCreateBulk{err: fmt.Errorf("calling to UserDeviceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UserDeviceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UserDeviceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for UserDevice.
+func (c *UserDeviceClient) Update() *UserDeviceUpdate {
+	mutation := newUserDeviceMutation(c.config, OpUpdate)
+	return &UserDeviceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UserDeviceClient) UpdateOne(_m *UserDevice) *UserDeviceUpdateOne {
+	mutation := newUserDeviceMutation(c.config, OpUpdateOne, withUserDevice(_m))
+	return &UserDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *UserDeviceClient) UpdateOneID(id uuid.UUID) *UserDeviceUpdateOne {
+	mutation := newUserDeviceMutation(c.config, OpUpdateOne, withUserDeviceID(id))
+	return &UserDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for UserDevice.
+func (c *UserDeviceClient) Delete() *UserDeviceDelete {
+	mutation := newUserDeviceMutation(c.config, OpDelete)
+	return &UserDeviceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *UserDeviceClient) DeleteOne(_m *UserDevice) *UserDeviceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *UserDeviceClient) DeleteOneID(id uuid.UUID) *UserDeviceDeleteOne {
+	builder := c.Delete().Where(userdevice.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &UserDeviceDeleteOne{builder}
+}
+
+// Query returns a query builder for UserDevice.
+func (c *UserDeviceClient) Query() *UserDeviceQuery {
+	return &UserDeviceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUserDevice},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a UserDevice entity by its id.
+func (c *UserDeviceClient) Get(ctx context.Context, id uuid.UUID) (*UserDevice, error) {
+	return c.Query().Where(userdevice.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *UserDeviceClient) GetX(ctx context.Context, id uuid.UUID) *UserDevice {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a UserDevice.
+func (c *UserDeviceClient) QueryUser(_m *UserDevice) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(userdevice.Table, userdevice.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, userdevice.UserTable, userdevice.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *UserDeviceClient) Hooks() []Hook {
+	hooks := c.hooks.UserDevice
+	return append(hooks[:len(hooks):len(hooks)], userdevice.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *UserDeviceClient) Interceptors() []Interceptor {
+	return c.inters.UserDevice
+}
+
+func (c *UserDeviceClient) mutate(ctx context.Context, m *UserDeviceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UserDeviceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UserDeviceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UserDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UserDeviceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown UserDevice mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
 		Brand, Cart, CartItem, Category, DeliveryCondition, OAuthIdentity, Offer,
-		Product, ProductNutrition, Store, User []ent.Hook
+		OrderLiveActivity, Product, ProductNutrition, Store, User,
+		UserDevice []ent.Hook
 	}
 	inters struct {
 		Brand, Cart, CartItem, Category, DeliveryCondition, OAuthIdentity, Offer,
-		Product, ProductNutrition, Store, User []ent.Interceptor
+		OrderLiveActivity, Product, ProductNutrition, Store, User,
+		UserDevice []ent.Interceptor
 	}
 )

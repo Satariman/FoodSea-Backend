@@ -27,6 +27,9 @@ type OAuthIdentity func(*sql.Selector)
 // Offer is the predicate function for offer builders.
 type Offer func(*sql.Selector)
 
+// OrderLiveActivity is the predicate function for orderliveactivity builders.
+type OrderLiveActivity func(*sql.Selector)
+
 // Product is the predicate function for product builders.
 type Product func(*sql.Selector)
 
@@ -38,3 +41,6 @@ type Store func(*sql.Selector)
 
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
+
+// UserDevice is the predicate function for userdevice builders.
+type UserDevice func(*sql.Selector)

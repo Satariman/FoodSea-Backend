@@ -10,11 +10,13 @@ import (
 	"github.com/foodsea/core/ent/deliverycondition"
 	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
+	"github.com/foodsea/core/ent/orderliveactivity"
 	"github.com/foodsea/core/ent/predicate"
 	"github.com/foodsea/core/ent/product"
 	"github.com/foodsea/core/ent/productnutrition"
 	"github.com/foodsea/core/ent/store"
 	"github.com/foodsea/core/ent/user"
+	"github.com/foodsea/core/ent/userdevice"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -24,7 +26,7 @@ import (
 
 // schemaGraph holds a representation of ent/schema at runtime.
 var schemaGraph = func() *sqlgraph.Schema {
-	graph := &sqlgraph.Schema{Nodes: make([]*sqlgraph.Node, 11)}
+	graph := &sqlgraph.Schema{Nodes: make([]*sqlgraph.Node, 13)}
 	graph.Nodes[0] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   brand.Table,
@@ -150,6 +152,25 @@ var schemaGraph = func() *sqlgraph.Schema {
 	}
 	graph.Nodes[7] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
+			Table:   orderliveactivity.Table,
+			Columns: orderliveactivity.Columns,
+			ID: &sqlgraph.FieldSpec{
+				Type:   field.TypeUUID,
+				Column: orderliveactivity.FieldID,
+			},
+		},
+		Type: "OrderLiveActivity",
+		Fields: map[string]*sqlgraph.FieldSpec{
+			orderliveactivity.FieldUserID:      {Type: field.TypeUUID, Column: orderliveactivity.FieldUserID},
+			orderliveactivity.FieldPushToken:   {Type: field.TypeString, Column: orderliveactivity.FieldPushToken},
+			orderliveactivity.FieldBundleID:    {Type: field.TypeString, Column: orderliveactivity.FieldBundleID},
+			orderliveactivity.FieldEnvironment: {Type: field.TypeEnum, Column: orderliveactivity.FieldEnvironment},
+			orderliveactivity.FieldStartedAt:   {Type: field.TypeTime, Column: orderliveactivity.FieldStartedAt},
+			orderliveactivity.FieldUpdatedAt:   {Type: field.TypeTime, Column: orderliveactivity.FieldUpdatedAt},
+		},
+	}
+	graph.Nodes[8] = &sqlgraph.Node{
+		NodeSpec: sqlgraph.NodeSpec{
 			Table:   product.Table,
 			Columns: product.Columns,
 			ID: &sqlgraph.FieldSpec{
@@ -173,7 +194,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			product.FieldBrandID:       {Type: field.TypeUUID, Column: product.FieldBrandID},
 		},
 	}
-	graph.Nodes[8] = &sqlgraph.Node{
+	graph.Nodes[9] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   productnutrition.Table,
 			Columns: productnutrition.Columns,
@@ -191,7 +212,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			productnutrition.FieldCarbohydrates: {Type: field.TypeFloat64, Column: productnutrition.FieldCarbohydrates},
 		},
 	}
-	graph.Nodes[9] = &sqlgraph.Node{
+	graph.Nodes[10] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   store.Table,
 			Columns: store.Columns,
@@ -209,7 +230,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			store.FieldCreatedAt: {Type: field.TypeTime, Column: store.FieldCreatedAt},
 		},
 	}
-	graph.Nodes[10] = &sqlgraph.Node{
+	graph.Nodes[11] = &sqlgraph.Node{
 		NodeSpec: sqlgraph.NodeSpec{
 			Table:   user.Table,
 			Columns: user.Columns,
@@ -226,6 +247,25 @@ var schemaGraph = func() *sqlgraph.Schema {
 			user.FieldEmail:          {Type: field.TypeString, Column: user.FieldEmail},
 			user.FieldPasswordHash:   {Type: field.TypeString, Column: user.FieldPasswordHash},
 			user.FieldOnboardingDone: {Type: field.TypeBool, Column: user.FieldOnboardingDone},
+		},
+	}
+	graph.Nodes[12] = &sqlgraph.Node{
+		NodeSpec: sqlgraph.NodeSpec{
+			Table:   userdevice.Table,
+			Columns: userdevice.Columns,
+			ID: &sqlgraph.FieldSpec{
+				Type:   field.TypeUUID,
+				Column: userdevice.FieldID,
+			},
+		},
+		Type: "UserDevice",
+		Fields: map[string]*sqlgraph.FieldSpec{
+			userdevice.FieldCreatedAt:   {Type: field.TypeTime, Column: userdevice.FieldCreatedAt},
+			userdevice.FieldUpdatedAt:   {Type: field.TypeTime, Column: userdevice.FieldUpdatedAt},
+			userdevice.FieldApnsToken:   {Type: field.TypeString, Column: userdevice.FieldApnsToken},
+			userdevice.FieldBundleID:    {Type: field.TypeString, Column: userdevice.FieldBundleID},
+			userdevice.FieldEnvironment: {Type: field.TypeEnum, Column: userdevice.FieldEnvironment},
+			userdevice.FieldAppVersion:  {Type: field.TypeString, Column: userdevice.FieldAppVersion},
 		},
 	}
 	graph.MustAddE(
@@ -385,6 +425,18 @@ var schemaGraph = func() *sqlgraph.Schema {
 		"Store",
 	)
 	graph.MustAddE(
+		"user",
+		&sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   orderliveactivity.UserTable,
+			Columns: []string{orderliveactivity.UserColumn},
+			Bidi:    false,
+		},
+		"OrderLiveActivity",
+		"User",
+	)
+	graph.MustAddE(
 		"category",
 		&sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -515,6 +567,18 @@ var schemaGraph = func() *sqlgraph.Schema {
 		},
 		"User",
 		"OAuthIdentity",
+	)
+	graph.MustAddE(
+		"user",
+		&sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   userdevice.UserTable,
+			Columns: []string{userdevice.UserColumn},
+			Bidi:    false,
+		},
+		"UserDevice",
+		"User",
 	)
 	return graph
 }()
@@ -1148,6 +1212,90 @@ func (f *OfferFilter) WhereHasStoreWith(preds ...predicate.Store) {
 }
 
 // addPredicate implements the predicateAdder interface.
+func (_q *OrderLiveActivityQuery) addPredicate(pred func(s *sql.Selector)) {
+	_q.predicates = append(_q.predicates, pred)
+}
+
+// Filter returns a Filter implementation to apply filters on the OrderLiveActivityQuery builder.
+func (_q *OrderLiveActivityQuery) Filter() *OrderLiveActivityFilter {
+	return &OrderLiveActivityFilter{config: _q.config, predicateAdder: _q}
+}
+
+// addPredicate implements the predicateAdder interface.
+func (m *OrderLiveActivityMutation) addPredicate(pred func(s *sql.Selector)) {
+	m.predicates = append(m.predicates, pred)
+}
+
+// Filter returns an entql.Where implementation to apply filters on the OrderLiveActivityMutation builder.
+func (m *OrderLiveActivityMutation) Filter() *OrderLiveActivityFilter {
+	return &OrderLiveActivityFilter{config: m.config, predicateAdder: m}
+}
+
+// OrderLiveActivityFilter provides a generic filtering capability at runtime for OrderLiveActivityQuery.
+type OrderLiveActivityFilter struct {
+	predicateAdder
+	config
+}
+
+// Where applies the entql predicate on the query filter.
+func (f *OrderLiveActivityFilter) Where(p entql.P) {
+	f.addPredicate(func(s *sql.Selector) {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[7].Type, p, s); err != nil {
+			s.AddError(err)
+		}
+	})
+}
+
+// WhereID applies the entql [16]byte predicate on the id field.
+func (f *OrderLiveActivityFilter) WhereID(p entql.ValueP) {
+	f.Where(p.Field(orderliveactivity.FieldID))
+}
+
+// WhereUserID applies the entql [16]byte predicate on the user_id field.
+func (f *OrderLiveActivityFilter) WhereUserID(p entql.ValueP) {
+	f.Where(p.Field(orderliveactivity.FieldUserID))
+}
+
+// WherePushToken applies the entql string predicate on the push_token field.
+func (f *OrderLiveActivityFilter) WherePushToken(p entql.StringP) {
+	f.Where(p.Field(orderliveactivity.FieldPushToken))
+}
+
+// WhereBundleID applies the entql string predicate on the bundle_id field.
+func (f *OrderLiveActivityFilter) WhereBundleID(p entql.StringP) {
+	f.Where(p.Field(orderliveactivity.FieldBundleID))
+}
+
+// WhereEnvironment applies the entql string predicate on the environment field.
+func (f *OrderLiveActivityFilter) WhereEnvironment(p entql.StringP) {
+	f.Where(p.Field(orderliveactivity.FieldEnvironment))
+}
+
+// WhereStartedAt applies the entql time.Time predicate on the started_at field.
+func (f *OrderLiveActivityFilter) WhereStartedAt(p entql.TimeP) {
+	f.Where(p.Field(orderliveactivity.FieldStartedAt))
+}
+
+// WhereUpdatedAt applies the entql time.Time predicate on the updated_at field.
+func (f *OrderLiveActivityFilter) WhereUpdatedAt(p entql.TimeP) {
+	f.Where(p.Field(orderliveactivity.FieldUpdatedAt))
+}
+
+// WhereHasUser applies a predicate to check if query has an edge user.
+func (f *OrderLiveActivityFilter) WhereHasUser() {
+	f.Where(entql.HasEdge("user"))
+}
+
+// WhereHasUserWith applies a predicate to check if query has an edge user with a given conditions (other predicates).
+func (f *OrderLiveActivityFilter) WhereHasUserWith(preds ...predicate.User) {
+	f.Where(entql.HasEdgeWith("user", sqlgraph.WrapFunc(func(s *sql.Selector) {
+		for _, p := range preds {
+			p(s)
+		}
+	})))
+}
+
+// addPredicate implements the predicateAdder interface.
 func (_q *ProductQuery) addPredicate(pred func(s *sql.Selector)) {
 	_q.predicates = append(_q.predicates, pred)
 }
@@ -1176,7 +1324,7 @@ type ProductFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *ProductFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[7].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[8].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1360,7 +1508,7 @@ type ProductNutritionFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *ProductNutritionFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[8].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[9].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1439,7 +1587,7 @@ type StoreFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *StoreFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[9].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[10].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1532,7 +1680,7 @@ type UserFilter struct {
 // Where applies the entql predicate on the query filter.
 func (f *UserFilter) Where(p entql.P) {
 	f.addPredicate(func(s *sql.Selector) {
-		if err := schemaGraph.EvalP(schemaGraph.Nodes[10].Type, p, s); err != nil {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[11].Type, p, s); err != nil {
 			s.AddError(err)
 		}
 	})
@@ -1595,6 +1743,90 @@ func (f *UserFilter) WhereHasOauthIdentities() {
 // WhereHasOauthIdentitiesWith applies a predicate to check if query has an edge oauth_identities with a given conditions (other predicates).
 func (f *UserFilter) WhereHasOauthIdentitiesWith(preds ...predicate.OAuthIdentity) {
 	f.Where(entql.HasEdgeWith("oauth_identities", sqlgraph.WrapFunc(func(s *sql.Selector) {
+		for _, p := range preds {
+			p(s)
+		}
+	})))
+}
+
+// addPredicate implements the predicateAdder interface.
+func (_q *UserDeviceQuery) addPredicate(pred func(s *sql.Selector)) {
+	_q.predicates = append(_q.predicates, pred)
+}
+
+// Filter returns a Filter implementation to apply filters on the UserDeviceQuery builder.
+func (_q *UserDeviceQuery) Filter() *UserDeviceFilter {
+	return &UserDeviceFilter{config: _q.config, predicateAdder: _q}
+}
+
+// addPredicate implements the predicateAdder interface.
+func (m *UserDeviceMutation) addPredicate(pred func(s *sql.Selector)) {
+	m.predicates = append(m.predicates, pred)
+}
+
+// Filter returns an entql.Where implementation to apply filters on the UserDeviceMutation builder.
+func (m *UserDeviceMutation) Filter() *UserDeviceFilter {
+	return &UserDeviceFilter{config: m.config, predicateAdder: m}
+}
+
+// UserDeviceFilter provides a generic filtering capability at runtime for UserDeviceQuery.
+type UserDeviceFilter struct {
+	predicateAdder
+	config
+}
+
+// Where applies the entql predicate on the query filter.
+func (f *UserDeviceFilter) Where(p entql.P) {
+	f.addPredicate(func(s *sql.Selector) {
+		if err := schemaGraph.EvalP(schemaGraph.Nodes[12].Type, p, s); err != nil {
+			s.AddError(err)
+		}
+	})
+}
+
+// WhereID applies the entql [16]byte predicate on the id field.
+func (f *UserDeviceFilter) WhereID(p entql.ValueP) {
+	f.Where(p.Field(userdevice.FieldID))
+}
+
+// WhereCreatedAt applies the entql time.Time predicate on the created_at field.
+func (f *UserDeviceFilter) WhereCreatedAt(p entql.TimeP) {
+	f.Where(p.Field(userdevice.FieldCreatedAt))
+}
+
+// WhereUpdatedAt applies the entql time.Time predicate on the updated_at field.
+func (f *UserDeviceFilter) WhereUpdatedAt(p entql.TimeP) {
+	f.Where(p.Field(userdevice.FieldUpdatedAt))
+}
+
+// WhereApnsToken applies the entql string predicate on the apns_token field.
+func (f *UserDeviceFilter) WhereApnsToken(p entql.StringP) {
+	f.Where(p.Field(userdevice.FieldApnsToken))
+}
+
+// WhereBundleID applies the entql string predicate on the bundle_id field.
+func (f *UserDeviceFilter) WhereBundleID(p entql.StringP) {
+	f.Where(p.Field(userdevice.FieldBundleID))
+}
+
+// WhereEnvironment applies the entql string predicate on the environment field.
+func (f *UserDeviceFilter) WhereEnvironment(p entql.StringP) {
+	f.Where(p.Field(userdevice.FieldEnvironment))
+}
+
+// WhereAppVersion applies the entql string predicate on the app_version field.
+func (f *UserDeviceFilter) WhereAppVersion(p entql.StringP) {
+	f.Where(p.Field(userdevice.FieldAppVersion))
+}
+
+// WhereHasUser applies a predicate to check if query has an edge user.
+func (f *UserDeviceFilter) WhereHasUser() {
+	f.Where(entql.HasEdge("user"))
+}
+
+// WhereHasUserWith applies a predicate to check if query has an edge user with a given conditions (other predicates).
+func (f *UserDeviceFilter) WhereHasUserWith(preds ...predicate.User) {
+	f.Where(entql.HasEdgeWith("user", sqlgraph.WrapFunc(func(s *sql.Selector) {
 		for _, p := range preds {
 			p(s)
 		}

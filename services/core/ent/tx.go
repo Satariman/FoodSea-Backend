@@ -26,6 +26,8 @@ type Tx struct {
 	OAuthIdentity *OAuthIdentityClient
 	// Offer is the client for interacting with the Offer builders.
 	Offer *OfferClient
+	// OrderLiveActivity is the client for interacting with the OrderLiveActivity builders.
+	OrderLiveActivity *OrderLiveActivityClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductNutrition is the client for interacting with the ProductNutrition builders.
@@ -34,6 +36,8 @@ type Tx struct {
 	Store *StoreClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// UserDevice is the client for interacting with the UserDevice builders.
+	UserDevice *UserDeviceClient
 
 	// lazily loaded.
 	client     *Client
@@ -172,10 +176,12 @@ func (tx *Tx) init() {
 	tx.DeliveryCondition = NewDeliveryConditionClient(tx.config)
 	tx.OAuthIdentity = NewOAuthIdentityClient(tx.config)
 	tx.Offer = NewOfferClient(tx.config)
+	tx.OrderLiveActivity = NewOrderLiveActivityClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductNutrition = NewProductNutritionClient(tx.config)
 	tx.Store = NewStoreClient(tx.config)
 	tx.User = NewUserClient(tx.config)
+	tx.UserDevice = NewUserDeviceClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

@@ -12,11 +12,13 @@ import (
 	"github.com/foodsea/core/ent/deliverycondition"
 	"github.com/foodsea/core/ent/oauthidentity"
 	"github.com/foodsea/core/ent/offer"
+	"github.com/foodsea/core/ent/orderliveactivity"
 	"github.com/foodsea/core/ent/product"
 	"github.com/foodsea/core/ent/productnutrition"
 	"github.com/foodsea/core/ent/schema"
 	"github.com/foodsea/core/ent/store"
 	"github.com/foodsea/core/ent/user"
+	"github.com/foodsea/core/ent/userdevice"
 	"github.com/google/uuid"
 )
 
@@ -164,6 +166,26 @@ func init() {
 	offerDescID := offerFields[0].Descriptor()
 	// offer.DefaultID holds the default value on creation for the id field.
 	offer.DefaultID = offerDescID.Default.(func() uuid.UUID)
+	orderliveactivityFields := schema.OrderLiveActivity{}.Fields()
+	_ = orderliveactivityFields
+	// orderliveactivityDescPushToken is the schema descriptor for push_token field.
+	orderliveactivityDescPushToken := orderliveactivityFields[2].Descriptor()
+	// orderliveactivity.PushTokenValidator is a validator for the "push_token" field. It is called by the builders before save.
+	orderliveactivity.PushTokenValidator = orderliveactivityDescPushToken.Validators[0].(func(string) error)
+	// orderliveactivityDescBundleID is the schema descriptor for bundle_id field.
+	orderliveactivityDescBundleID := orderliveactivityFields[3].Descriptor()
+	// orderliveactivity.BundleIDValidator is a validator for the "bundle_id" field. It is called by the builders before save.
+	orderliveactivity.BundleIDValidator = orderliveactivityDescBundleID.Validators[0].(func(string) error)
+	// orderliveactivityDescStartedAt is the schema descriptor for started_at field.
+	orderliveactivityDescStartedAt := orderliveactivityFields[5].Descriptor()
+	// orderliveactivity.DefaultStartedAt holds the default value on creation for the started_at field.
+	orderliveactivity.DefaultStartedAt = orderliveactivityDescStartedAt.Default.(func() time.Time)
+	// orderliveactivityDescUpdatedAt is the schema descriptor for updated_at field.
+	orderliveactivityDescUpdatedAt := orderliveactivityFields[6].Descriptor()
+	// orderliveactivity.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	orderliveactivity.DefaultUpdatedAt = orderliveactivityDescUpdatedAt.Default.(func() time.Time)
+	// orderliveactivity.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	orderliveactivity.UpdateDefaultUpdatedAt = orderliveactivityDescUpdatedAt.UpdateDefault.(func() time.Time)
 	productMixin := schema.Product{}.Mixin()
 	productMixinHooks0 := productMixin[0].Hooks()
 	product.Hooks[0] = productMixinHooks0[0]
@@ -256,6 +278,31 @@ func init() {
 	userDescID := userFields[0].Descriptor()
 	// user.DefaultID holds the default value on creation for the id field.
 	user.DefaultID = userDescID.Default.(func() uuid.UUID)
+	userdeviceMixin := schema.UserDevice{}.Mixin()
+	userdeviceMixinHooks0 := userdeviceMixin[0].Hooks()
+	userdevice.Hooks[0] = userdeviceMixinHooks0[0]
+	userdeviceMixinFields0 := userdeviceMixin[0].Fields()
+	_ = userdeviceMixinFields0
+	userdeviceFields := schema.UserDevice{}.Fields()
+	_ = userdeviceFields
+	// userdeviceDescCreatedAt is the schema descriptor for created_at field.
+	userdeviceDescCreatedAt := userdeviceMixinFields0[0].Descriptor()
+	// userdevice.DefaultCreatedAt holds the default value on creation for the created_at field.
+	userdevice.DefaultCreatedAt = userdeviceDescCreatedAt.Default.(func() time.Time)
+	// userdeviceDescUpdatedAt is the schema descriptor for updated_at field.
+	userdeviceDescUpdatedAt := userdeviceMixinFields0[1].Descriptor()
+	// userdevice.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	userdevice.DefaultUpdatedAt = userdeviceDescUpdatedAt.Default.(func() time.Time)
+	// userdevice.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	userdevice.UpdateDefaultUpdatedAt = userdeviceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// userdeviceDescApnsToken is the schema descriptor for apns_token field.
+	userdeviceDescApnsToken := userdeviceFields[1].Descriptor()
+	// userdevice.ApnsTokenValidator is a validator for the "apns_token" field. It is called by the builders before save.
+	userdevice.ApnsTokenValidator = userdeviceDescApnsToken.Validators[0].(func(string) error)
+	// userdeviceDescBundleID is the schema descriptor for bundle_id field.
+	userdeviceDescBundleID := userdeviceFields[2].Descriptor()
+	// userdevice.BundleIDValidator is a validator for the "bundle_id" field. It is called by the builders before save.
+	userdevice.BundleIDValidator = userdeviceDescBundleID.Validators[0].(func(string) error)
 }
 
 const (

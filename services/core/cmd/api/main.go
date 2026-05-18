@@ -29,6 +29,8 @@ import (
 	"github.com/foodsea/core/internal/modules/catalog"
 	"github.com/foodsea/core/internal/modules/identity"
 	"github.com/foodsea/core/internal/modules/images"
+	"github.com/foodsea/core/internal/modules/notifications"
+	notificationsapns "github.com/foodsea/core/internal/modules/notifications/apns"
 	"github.com/foodsea/core/internal/modules/partners"
 	"github.com/foodsea/core/internal/modules/photo_search"
 	"github.com/foodsea/core/internal/modules/search"
@@ -74,6 +76,12 @@ func main() {
 
 	cartProducer := kafka.NewProducer(cfg.Kafka.Brokers, "cart.events", log)
 	defer cartProducer.Close()
+
+	notificationsAPNSClient, err := notificationsapns.NewClient(cfg.APNS)
+	if err != nil {
+		log.Error("failed to initialise notifications APNS client", "error", err)
+		os.Exit(1)
+	}
 
 	s3Client, err := s3platform.NewClient(ctx, s3platform.Config{
 		Endpoint:        cfg.S3.Endpoint,
@@ -159,6 +167,19 @@ func main() {
 		MaxImageBytes: cfg.PhotoSearch.MaxImageBytes,
 		Timeout:       cfg.PhotoSearch.Timeout,
 	})
+	notificationsModule := notifications.NewModule(notifications.Deps{
+		Ent:          entClient,
+		Log:          log,
+		KafkaBrokers: cfg.Kafka.Brokers,
+		KafkaTopic:   cfg.Notifications.Kafka.Topic,
+		KafkaGroupID: cfg.Notifications.Kafka.GroupID,
+		APNS:         notificationsAPNSClient,
+	})
+	defer func() {
+		if err := notificationsModule.CloseOrderEventsConsumer(); err != nil {
+			log.Warn("failed to close notifications consumer", "error", err)
+		}
+	}()
 
 	// ── HTTP server ───────────────────────────────────────────────────────────
 
@@ -192,6 +213,7 @@ func main() {
 	cartModule.RegisterRoutes(protected)
 	voiceModule.RegisterRoutes(protected)
 	photoSearchModule.RegisterRoutes(protected)
+	notificationsModule.RegisterRoutes(protected)
 	imagesModule.RegisterRoutes(admin)
 
 	httpServer := &http.Server{
@@ -232,6 +254,17 @@ func main() {
 		log.Info("gRPC server starting", "port", cfg.GRPC.Port)
 		if err := grpcSrv.Serve(grpcLis); err != nil {
 			return fmt.Errorf("grpc server: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		log.Info("notifications consumer starting",
+			"topic", cfg.Notifications.Kafka.Topic,
+			"group_id", cfg.Notifications.Kafka.GroupID,
+		)
+		if err := notificationsModule.RunOrderEventsConsumer(gCtx); err != nil {
+			return fmt.Errorf("notifications consumer: %w", err)
 		}
 		return nil
 	})

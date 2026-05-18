@@ -227,6 +227,37 @@ var (
 			},
 		},
 	}
+	// OrderLiveActivitiesColumns holds the columns for the "order_live_activities" table.
+	OrderLiveActivitiesColumns = []*schema.Column{
+		{Name: "order_id", Type: field.TypeUUID},
+		{Name: "push_token", Type: field.TypeString},
+		{Name: "bundle_id", Type: field.TypeString},
+		{Name: "environment", Type: field.TypeEnum, Enums: []string{"sandbox", "production"}},
+		{Name: "started_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeUUID},
+	}
+	// OrderLiveActivitiesTable holds the schema information for the "order_live_activities" table.
+	OrderLiveActivitiesTable = &schema.Table{
+		Name:       "order_live_activities",
+		Columns:    OrderLiveActivitiesColumns,
+		PrimaryKey: []*schema.Column{OrderLiveActivitiesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "order_live_activities_users_user",
+				Columns:    []*schema.Column{OrderLiveActivitiesColumns[6]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "orderliveactivity_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{OrderLiveActivitiesColumns[6]},
+			},
+		},
+	}
 	// ProductsColumns holds the columns for the "products" table.
 	ProductsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -362,6 +393,37 @@ var (
 		Columns:    UsersColumns,
 		PrimaryKey: []*schema.Column{UsersColumns[0]},
 	}
+	// UserDevicesColumns holds the columns for the "user_devices" table.
+	UserDevicesColumns = []*schema.Column{
+		{Name: "user_id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "apns_token", Type: field.TypeString},
+		{Name: "bundle_id", Type: field.TypeString},
+		{Name: "environment", Type: field.TypeEnum, Enums: []string{"sandbox", "production"}},
+		{Name: "app_version", Type: field.TypeString, Nullable: true},
+	}
+	// UserDevicesTable holds the schema information for the "user_devices" table.
+	UserDevicesTable = &schema.Table{
+		Name:       "user_devices",
+		Columns:    UserDevicesColumns,
+		PrimaryKey: []*schema.Column{UserDevicesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "user_devices_users_user",
+				Columns:    []*schema.Column{UserDevicesColumns[0]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "userdevice_apns_token",
+				Unique:  false,
+				Columns: []*schema.Column{UserDevicesColumns[3]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		BrandsTable,
@@ -371,10 +433,12 @@ var (
 		DeliveryConditionsTable,
 		OauthIdentitiesTable,
 		OffersTable,
+		OrderLiveActivitiesTable,
 		ProductsTable,
 		ProductNutritionsTable,
 		StoresTable,
 		UsersTable,
+		UserDevicesTable,
 	}
 )
 
@@ -387,8 +451,10 @@ func init() {
 	OauthIdentitiesTable.ForeignKeys[0].RefTable = UsersTable
 	OffersTable.ForeignKeys[0].RefTable = ProductsTable
 	OffersTable.ForeignKeys[1].RefTable = StoresTable
+	OrderLiveActivitiesTable.ForeignKeys[0].RefTable = UsersTable
 	ProductsTable.ForeignKeys[0].RefTable = BrandsTable
 	ProductsTable.ForeignKeys[1].RefTable = CategoriesTable
 	ProductsTable.ForeignKeys[2].RefTable = CategoriesTable
 	ProductNutritionsTable.ForeignKeys[0].RefTable = ProductsTable
+	UserDevicesTable.ForeignKeys[0].RefTable = UsersTable
 }
