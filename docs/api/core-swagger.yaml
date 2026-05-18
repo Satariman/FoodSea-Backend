@@ -325,6 +325,40 @@ definitions:
       image_url:
         type: string
     type: object
+  internal_modules_notifications_handler.RegisterDeviceRequest:
+    properties:
+      apns_token:
+        type: string
+      app_version:
+        type: string
+      bundle_id:
+        type: string
+      environment:
+        enum:
+        - sandbox
+        - production
+        type: string
+    required:
+    - apns_token
+    - bundle_id
+    - environment
+    type: object
+  internal_modules_notifications_handler.RegisterLiveActivityRequest:
+    properties:
+      bundle_id:
+        type: string
+      environment:
+        enum:
+        - sandbox
+        - production
+        type: string
+      push_token:
+        type: string
+    required:
+    - push_token
+    - bundle_id
+    - environment
+    type: object
   internal_modules_partners_handler.OfferResponse:
     properties:
       discount_percent:
@@ -953,6 +987,130 @@ paths:
       summary: List categories
       tags:
       - Categories
+  /notifications/devices:
+    delete:
+      description: Removes all APNs device tokens for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Remove notification devices
+      tags:
+      - Notifications
+    post:
+      consumes:
+      - application/json
+      description: Registers or updates an APNs device token for the authenticated
+        user
+      parameters:
+      - description: Register device request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notifications_handler.RegisterDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Register notification device
+      tags:
+      - Notifications
+  /notifications/orders/{orderId}/live-activity:
+    delete:
+      description: Removes live activity token binding for an order
+      parameters:
+      - description: Order UUID
+        in: path
+        name: orderId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Remove order live activity token
+      tags:
+      - Notifications
+    post:
+      consumes:
+      - application/json
+      description: Registers or updates a live activity token for an order
+      parameters:
+      - description: Order UUID
+        in: path
+        name: orderId
+        required: true
+        type: string
+      - description: Register live activity request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notifications_handler.RegisterLiveActivityRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_foodsea_core_internal_platform_httputil.Response'
+      security:
+      - BearerAuth: []
+      summary: Register order live activity token
+      tags:
+      - Notifications
   /products:
     get:
       description: Returns a paginated list of products with optional filters

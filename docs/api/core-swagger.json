@@ -1431,6 +1431,200 @@
                     }
                 }
             }
+        },
+        "/notifications/devices": {
+            "delete": {
+                "description": "Removes all APNs device tokens for the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Remove notification devices",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "description": "Registers or updates an APNs device token for the authenticated user",
+                "parameters": [
+                    {
+                        "description": "Register device request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_notifications_handler.RegisterDeviceRequest"
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Register notification device",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/notifications/orders/{orderId}/live-activity": {
+            "delete": {
+                "description": "Removes live activity token binding for an order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order UUID",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Remove order live activity token",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "description": "Registers or updates a live activity token for an order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order UUID",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Register live activity request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_notifications_handler.RegisterLiveActivityRequest"
+                        }
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Register order live activity token",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "definitions": {
@@ -2023,6 +2217,55 @@
                 },
                 "subcategory_id": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_modules_notifications_handler.RegisterDeviceRequest": {
+            "type": "object",
+            "required": [
+                "apns_token",
+                "bundle_id",
+                "environment"
+            ],
+            "properties": {
+                "apns_token": {
+                    "type": "string"
+                },
+                "app_version": {
+                    "type": "string"
+                },
+                "bundle_id": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "string",
+                    "enum": [
+                        "sandbox",
+                        "production"
+                    ]
+                }
+            }
+        },
+        "internal_modules_notifications_handler.RegisterLiveActivityRequest": {
+            "type": "object",
+            "required": [
+                "push_token",
+                "bundle_id",
+                "environment"
+            ],
+            "properties": {
+                "push_token": {
+                    "type": "string"
+                },
+                "bundle_id": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "string",
+                    "enum": [
+                        "sandbox",
+                        "production"
+                    ]
                 }
             }
         }

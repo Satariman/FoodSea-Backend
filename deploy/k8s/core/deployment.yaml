@@ -26,6 +26,34 @@ spec:
             name: core-config
         - secretRef:
             name: core-secrets
+        - secretRef:
+            name: apns-credentials
+        env:
+        - name: APNS_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: core-config
+              key: APNS_DEFAULT_ENVIRONMENT
+        - name: APNS_BUNDLE_ID
+          valueFrom:
+            secretKeyRef:
+              name: apns-credentials
+              key: APNS_BUNDLE_ID
+        - name: APNS_TEAM_ID
+          valueFrom:
+            secretKeyRef:
+              name: apns-credentials
+              key: APNS_TEAM_ID
+        - name: APNS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: apns-credentials
+              key: APNS_KEY_ID
+        - name: APNS_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: apns-credentials
+              key: APNS_PRIVATE_KEY
         livenessProbe:
           httpGet:
             path: /health

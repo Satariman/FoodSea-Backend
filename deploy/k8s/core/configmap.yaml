@@ -12,5 +12,8 @@ data:
   DB_NAME: core_db
   REDIS_URL: redis://redis:6379/0
   KAFKA_BROKERS: kafka:9092
+  NOTIFICATIONS_KAFKA_GROUP_ID: core-notifications
+  NOTIFICATIONS_KAFKA_TOPIC: order.events
+  APNS_DEFAULT_ENVIRONMENT: production
   JWT_ACCESS_TTL: 15m
   JWT_REFRESH_TTL: 720h
