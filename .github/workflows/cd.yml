@@ -134,6 +134,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           port: ${{ secrets.VM_SSH_PORT || 22 }}
+          command_timeout: 30m
           script_stop: true
           script: |
             set -euo pipefail
@@ -192,12 +193,15 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           port: ${{ secrets.VM_SSH_PORT || 22 }}
+          command_timeout: 30m
           script_stop: true
           script: |
             set -euo pipefail
             cd /opt/foodsea/backend-dev
             git rev-parse HEAD
 
+            python3 -m venv services/ml/.venv
+            make -C services/ml install
             make test-all
 
             check_code() {
