@@ -24,7 +24,6 @@ const (
 	appleDefaultJWKSURL      = "https://appleid.apple.com/auth/keys"
 	appleDefaultIssuer       = "https://appleid.apple.com"
 	appleDefaultJWKSCacheTTL = time.Hour
-	appleMaxTokenAge         = 10 * time.Minute
 	appleClockSkew           = time.Minute
 )
 
@@ -102,17 +101,6 @@ func (p *AppleOAuthProvider) ProfileFromToken(ctx context.Context, accessToken s
 
 	if strings.TrimSpace(claims.Subject) == "" {
 		return domain.OAuthProviderProfile{}, fmt.Errorf("%w: apple identity token missing sub", sherrors.ErrUnauthorized)
-	}
-
-	if claims.IssuedAt != nil {
-		now := p.now()
-		if claims.IssuedAt.Time.After(now.Add(appleClockSkew)) {
-			return domain.OAuthProviderProfile{}, fmt.Errorf("%w: apple identity token iat is in the future", sherrors.ErrUnauthorized)
-		}
-		issuedAgo := now.Sub(claims.IssuedAt.Time)
-		if issuedAgo > appleMaxTokenAge+appleClockSkew {
-			return domain.OAuthProviderProfile{}, fmt.Errorf("%w: apple identity token is too old", sherrors.ErrUnauthorized)
-		}
 	}
 
 	email := normalizeJWTString(claims.Email)

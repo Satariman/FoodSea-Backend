@@ -604,13 +604,12 @@ paths:
         name: provider
         required: true
         type: string
-      - description: 'Native OAuth callback payload (google: code/state/redirect_uri,
-          apple: identity_token + optional full_name/email)'
+      - description: OAuth callback payload (code, state, redirect_uri)
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_modules_identity_handler.OAuthNativeCallbackRequest'
+          $ref: '#/definitions/internal_modules_identity_handler.OAuthCallbackRequest'
       produces:
       - application/json
       responses:
@@ -690,12 +689,13 @@ paths:
         name: provider
         required: true
         type: string
-      - description: OAuth callback payload
+      - description: 'Native OAuth callback payload (google/yandex: code,state,redirect_uri;
+          apple: identity_token with optional full_name,email)'
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_modules_identity_handler.OAuthCallbackRequest'
+          $ref: '#/definitions/internal_modules_identity_handler.OAuthNativeCallbackRequest'
       produces:
       - application/json
       responses:

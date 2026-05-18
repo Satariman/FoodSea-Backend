@@ -259,7 +259,7 @@ func (h *AuthHandler) OAuthNativeStart(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        provider path string true "OAuth provider"
-// @Param        body body OAuthNativeCallbackRequest true "Native OAuth callback payload (google: code/state/redirect_uri, apple: identity_token + optional full_name/email)"
+// @Param        body body OAuthCallbackRequest true "OAuth callback payload (code, state, redirect_uri)"
 // @Success      200 {object} httputil.Response{data=AuthResponse}
 // @Failure      400 {object} httputil.Response
 // @Failure      401 {object} httputil.Response
@@ -301,7 +301,7 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        provider path string true "OAuth provider"
-// @Param        body body OAuthCallbackRequest true "OAuth callback payload"
+// @Param        body body OAuthNativeCallbackRequest true "Native OAuth callback payload (google/yandex: code,state,redirect_uri; apple: identity_token with optional full_name,email)"
 // @Success      200 {object} httputil.Response{data=AuthResponse}
 // @Failure      400 {object} httputil.Response
 // @Failure      401 {object} httputil.Response

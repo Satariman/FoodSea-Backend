@@ -234,12 +234,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "OAuth callback payload",
+                        "description": "Native OAuth callback payload (google/yandex: code,state,redirect_uri; apple: identity_token with optional full_name,email)",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthCallbackRequest"
+                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthNativeCallbackRequest"
                         }
                     }
                 ],
@@ -448,12 +448,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Native OAuth callback payload (google: code/state/redirect_uri, apple: identity_token + optional full_name/email)",
+                        "description": "OAuth callback payload (code, state, redirect_uri)",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthNativeCallbackRequest"
+                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthCallbackRequest"
                         }
                     }
                 ],
