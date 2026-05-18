@@ -245,6 +245,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			user.FieldUpdatedAt:      {Type: field.TypeTime, Column: user.FieldUpdatedAt},
 			user.FieldPhone:          {Type: field.TypeString, Column: user.FieldPhone},
 			user.FieldEmail:          {Type: field.TypeString, Column: user.FieldEmail},
+			user.FieldFullName:       {Type: field.TypeString, Column: user.FieldFullName},
 			user.FieldPasswordHash:   {Type: field.TypeString, Column: user.FieldPasswordHash},
 			user.FieldOnboardingDone: {Type: field.TypeBool, Column: user.FieldOnboardingDone},
 		},
@@ -1709,6 +1710,11 @@ func (f *UserFilter) WherePhone(p entql.StringP) {
 // WhereEmail applies the entql string predicate on the email field.
 func (f *UserFilter) WhereEmail(p entql.StringP) {
 	f.Where(p.Field(user.FieldEmail))
+}
+
+// WhereFullName applies the entql string predicate on the full_name field.
+func (f *UserFilter) WhereFullName(p entql.StringP) {
+	f.Where(p.Field(user.FieldFullName))
 }
 
 // WherePasswordHash applies the entql string predicate on the password_hash field.

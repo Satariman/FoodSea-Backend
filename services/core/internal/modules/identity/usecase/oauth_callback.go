@@ -22,6 +22,7 @@ type OAuthCallback struct {
 
 type oauthResolveOptions struct {
 	disallowEmailLink bool
+	appleFullName     *string
 }
 
 func NewOAuthCallback(
@@ -132,6 +133,7 @@ func (o *OAuthCallback) ExecuteToken(ctx context.Context, req domain.OAuthTokenC
 			profile.EmailVerified = true
 		}
 		resolveOpts.disallowEmailLink = true
+		resolveOpts.appleFullName = normalizeOptionalFullName(req.FullName)
 	}
 
 	u, err := o.resolveUser(ctx, req.Provider, profile, resolveOpts)
@@ -174,8 +176,9 @@ func (o *OAuthCallback) resolveUser(
 		}
 
 		newUser := &domain.User{
-			ID:    uuid.New(),
-			Email: profile.Email,
+			ID:       uuid.New(),
+			Email:    profile.Email,
+			FullName: opts.appleFullName,
 		}
 		if err := o.users.CreateOAuth(ctx, newUser); err != nil {
 			return nil, err
@@ -210,6 +213,17 @@ func normalizeOptionalEmail(email *string) *string {
 		return nil
 	}
 	trimmed := strings.TrimSpace(*email)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func normalizeOptionalFullName(fullName *string) *string {
+	if fullName == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*fullName)
 	if trimmed == "" {
 		return nil
 	}

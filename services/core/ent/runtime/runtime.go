@@ -271,7 +271,7 @@ func init() {
 	// user.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	user.UpdateDefaultUpdatedAt = userDescUpdatedAt.UpdateDefault.(func() time.Time)
 	// userDescOnboardingDone is the schema descriptor for onboarding_done field.
-	userDescOnboardingDone := userFields[4].Descriptor()
+	userDescOnboardingDone := userFields[5].Descriptor()
 	// user.DefaultOnboardingDone holds the default value on creation for the onboarding_done field.
 	user.DefaultOnboardingDone = userDescOnboardingDone.Default.(bool)
 	// userDescID is the schema descriptor for id field.

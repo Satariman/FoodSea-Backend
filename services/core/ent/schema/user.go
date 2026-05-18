@@ -25,6 +25,7 @@ func (User) Fields() []ent.Field {
 		field.UUID("id", uuid.UUID{}).Default(uuid.New).Immutable(),
 		field.String("phone").Optional().Nillable().Unique(),
 		field.String("email").Optional().Nillable().Unique(),
+		field.String("full_name").Optional().Nillable(),
 		field.String("password_hash").Optional().Nillable(),
 		field.Bool("onboarding_done").Default(false),
 	}

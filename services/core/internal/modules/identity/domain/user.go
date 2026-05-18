@@ -13,6 +13,7 @@ type User struct {
 	ID             uuid.UUID
 	Phone          *string
 	Email          *string
+	FullName       *string
 	OnboardingDone bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time

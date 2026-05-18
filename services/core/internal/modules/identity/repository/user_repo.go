@@ -31,6 +31,7 @@ func (r *UserRepo) Create(ctx context.Context, u *domain.User, passwordHash stri
 		SetOnboardingDone(u.OnboardingDone).
 		SetNillableEmail(u.Email).
 		SetNillablePhone(u.Phone).
+		SetNillableFullName(u.FullName).
 		Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -50,6 +51,7 @@ func (r *UserRepo) CreateOAuth(ctx context.Context, u *domain.User) error {
 		SetOnboardingDone(u.OnboardingDone).
 		SetNillableEmail(u.Email).
 		SetNillablePhone(u.Phone).
+		SetNillableFullName(u.FullName).
 		Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -126,6 +128,7 @@ func toDomainUser(u *ent.User) *domain.User {
 		ID:             u.ID,
 		Phone:          u.Phone,
 		Email:          u.Email,
+		FullName:       u.FullName,
 		OnboardingDone: u.OnboardingDone,
 		CreatedAt:      u.CreatedAt,
 		UpdatedAt:      u.UpdatedAt,

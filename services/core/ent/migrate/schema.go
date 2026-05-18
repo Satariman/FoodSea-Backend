@@ -384,6 +384,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "phone", Type: field.TypeString, Unique: true, Nullable: true},
 		{Name: "email", Type: field.TypeString, Unique: true, Nullable: true},
+		{Name: "full_name", Type: field.TypeString, Nullable: true},
 		{Name: "password_hash", Type: field.TypeString, Nullable: true},
 		{Name: "onboarding_done", Type: field.TypeBool, Default: false},
 	}

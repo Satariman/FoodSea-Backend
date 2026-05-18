@@ -1,0 +1,6 @@
+h1:LvG4RGcfu+tcASiFCYkWklMpc4ZiZCJCtGBQBXiBsQc=
+20260424102431_initial.sql h1:SU9xb8d1NnFDQ/sb7kC7CQXU8Z0QQ/HnTuNUCvZB6ew=
+20260424102440_fulltext_index.sql h1:C4ZabHbtoe79XsrS+DrXjms9V12EW4cvLGskW98L7j8=
+20260509195000_oauth_identity.sql h1:xzNu8Ua+O/lwcUxaa2nQJzUsTU82Xb7ENVmTEmOe2b8=
+20260518040000_notifications.sql h1:TRVnDlcoV2XsXzRNufhDY3u3OfcK027+axKryAyDbHY=
+20260518123000_user_full_name.sql h1:VFedmNq3HHeGJoNh3zMt9qorY890KslJQ6WvPqpW3oo=

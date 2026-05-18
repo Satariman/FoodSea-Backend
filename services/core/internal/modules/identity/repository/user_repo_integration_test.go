@@ -118,12 +118,18 @@ func TestUserRepo_Integration(t *testing.T) {
 
 	t.Run("create oauth-only user without password hash", func(t *testing.T) {
 		email := "oauth_" + uuid.NewString()[:8] + "@example.com"
-		u := &domain.User{ID: uuid.New(), Email: &email}
+		fullName := "Apple Test User"
+		u := &domain.User{ID: uuid.New(), Email: &email, FullName: &fullName}
 		require.NoError(t, repo.CreateOAuth(ctx, u))
 
 		hash, err := repo.GetPasswordHash(ctx, u.ID)
 		require.NoError(t, err)
 		assert.Nil(t, hash)
+
+		found, err := repo.GetByID(ctx, u.ID)
+		require.NoError(t, err)
+		require.NotNil(t, found.FullName)
+		assert.Equal(t, fullName, *found.FullName)
 	})
 
 	t.Run("create regular user with empty password hash returns invalid input", func(t *testing.T) {
