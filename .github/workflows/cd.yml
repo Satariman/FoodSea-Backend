@@ -200,6 +200,13 @@ jobs:
             cd /opt/foodsea/backend-dev
             git rev-parse HEAD
 
+            export PATH="$(go env GOPATH)/bin:${PATH}"
+            if ! command -v atlas >/dev/null 2>&1; then
+              echo "atlas not found, installing..."
+              GOWORK=off go install ariga.io/atlas/cmd/atlas@latest
+            fi
+            atlas version || true
+
             python3 -m venv services/ml/.venv
             services/ml/.venv/bin/python -m pip install -U pip "setuptools>=68,<82" wheel
             services/ml/.venv/bin/python -m pip install -r services/ml/requirements-runtime.txt pytest==8.2.2
@@ -243,24 +250,32 @@ jobs:
               echo "endpoint check passed: ${name} status=${actual}"
             }
 
-            host="${{ secrets.DEV_HOST }}"
-            base="http://127.0.0.1"
+            curl_code() {
+              local method="$1"
+              local url="$2"
+              shift 2
+              curl -k -sS -L --max-redirs 5 -o /dev/null -w '%{http_code}' \
+                --resolve "${host}:443:127.0.0.1" \
+                -X "${method}" "${url}" "$@"
+            }
 
-            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" "${base}/api/v1/categories")
+            host="${{ secrets.DEV_HOST }}"
+            base="https://${host}"
+
+            code=$(curl_code GET "${base}/api/v1/categories")
             check_code 200 "${code}" "GET /api/v1/categories"
 
-            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" "${base}/api/v1/search?q=milk")
+            code=$(curl_code GET "${base}/api/v1/search?q=milk")
             check_code 200 "${code}" "GET /api/v1/search"
 
-            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" "${base}/api/v1/orders")
+            code=$(curl_code GET "${base}/api/v1/orders")
             check_code 401 "${code}" "GET /api/v1/orders without token"
 
-            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" -H 'Content-Type: application/json' \
-              -X POST "${base}/api/v1/voice/parse" --data '{"text":"молоко"}')
+            code=$(curl_code POST "${base}/api/v1/voice/parse" \
+              -H 'Content-Type: application/json' --data '{"text":"молоко"}')
             check_code 401 "${code}" "POST /api/v1/voice/parse without token"
 
-            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${host}" \
-              -X POST "${base}/api/v1/products/photo-search")
+            code=$(curl_code POST "${base}/api/v1/products/photo-search")
             check_code 401 "${code}" "POST /api/v1/products/photo-search without token"
 
       - name: Release traceability summary

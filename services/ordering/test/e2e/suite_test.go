@@ -376,6 +376,22 @@ func makeJWT(userID uuid.UUID) string {
 }
 
 func createKafkaTopics(ctx context.Context, broker string, topics ...string) error {
+	var lastErr error
+	for attempt := 1; attempt <= 20; attempt++ {
+		if err := createKafkaTopicsOnce(ctx, broker, topics...); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+		if ctx.Err() != nil {
+			return fmt.Errorf("create topics canceled: %w", ctx.Err())
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("create topics after retries: %w", lastErr)
+}
+
+func createKafkaTopicsOnce(ctx context.Context, broker string, topics ...string) error {
 	conn, err := skafka.DialContext(ctx, "tcp", broker)
 	if err != nil {
 		return fmt.Errorf("dial kafka broker: %w", err)
