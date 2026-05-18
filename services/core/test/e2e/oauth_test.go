@@ -122,7 +122,7 @@ func TestOAuthE2E(t *testing.T) {
 		resp.Body.Close()
 	})
 
-	t.Run("apple_native_callback_happy_path", func(t *testing.T) {
+		t.Run("apple_native_callback_happy_path", func(t *testing.T) {
 		email := "apple-new@foodsea.test"
 		token := signAppleIdentityToken(
 			"apple-sub-new",
@@ -143,11 +143,71 @@ func TestOAuthE2E(t *testing.T) {
 
 		var auth registerResp
 		require.NoError(t, decodeJSON(resp, &auth))
-		require.NotEmpty(t, auth.Data.Access)
-		require.NotEmpty(t, auth.Data.Refresh)
-	})
+			require.NotEmpty(t, auth.Data.Access)
+			require.NotEmpty(t, auth.Data.Refresh)
+		})
 
-	t.Run("apple_native_callback_malformed_token_unauthorized", func(t *testing.T) {
+		t.Run("apple_native_callback_repeat_same_sub_returns_same_user", func(t *testing.T) {
+			email := "apple-repeat@foodsea.test"
+			sub := "apple-sub-repeat"
+			issuedAt := time.Now()
+
+			firstToken := signAppleIdentityToken(
+				sub,
+				testAppleClientID,
+				testAppleIssuer,
+				&email,
+				issuedAt.Add(5*time.Minute),
+				issuedAt,
+			)
+
+			firstResp, err := postJSON(testBaseURL+"/api/v1/auth/oauth/native/apple/callback", map[string]string{
+				"identity_token": firstToken,
+				"email":          email,
+				"full_name":      "Apple Repeat User",
+			})
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, firstResp.StatusCode)
+
+			var firstAuth registerResp
+			require.NoError(t, decodeJSON(firstResp, &firstAuth))
+			require.NotEmpty(t, firstAuth.Data.User.ID)
+			require.NotEmpty(t, firstAuth.Data.Access)
+			require.NotEmpty(t, firstAuth.Data.Refresh)
+
+			secondIssuedAt := issuedAt.Add(30 * time.Second)
+			secondToken := signAppleIdentityToken(
+				sub,
+				testAppleClientID,
+				testAppleIssuer,
+				nil,
+				secondIssuedAt.Add(5*time.Minute),
+				secondIssuedAt,
+			)
+
+			secondResp, err := postJSON(testBaseURL+"/api/v1/auth/oauth/native/apple/callback", map[string]string{
+				"identity_token": secondToken,
+			})
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, secondResp.StatusCode)
+
+			var secondAuth registerResp
+			require.NoError(t, decodeJSON(secondResp, &secondAuth))
+			require.NotEmpty(t, secondAuth.Data.User.ID)
+			require.NotEmpty(t, secondAuth.Data.Access)
+			require.NotEmpty(t, secondAuth.Data.Refresh)
+			assert.Equal(t, firstAuth.Data.User.ID, secondAuth.Data.User.ID)
+
+			meRespRaw, err := getAuth(testBaseURL+"/api/v1/users/me", secondAuth.Data.Access)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, meRespRaw.StatusCode)
+
+			var me meResp
+			require.NoError(t, decodeJSON(meRespRaw, &me))
+			assert.Equal(t, firstAuth.Data.User.ID, me.Data.ID)
+		})
+
+		t.Run("apple_native_callback_malformed_token_unauthorized", func(t *testing.T) {
 		resp, err := postJSON(testBaseURL+"/api/v1/auth/oauth/native/apple/callback", map[string]string{
 			"identity_token": "not-a-jwt",
 		})
