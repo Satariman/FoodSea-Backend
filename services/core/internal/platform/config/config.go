@@ -309,14 +309,23 @@ func oauthPublicProviderConfig(provider string, defaults OAuthProviderConfig) OA
 }
 
 func oauthAppleConfig(defaults OAuthAppleConfig) OAuthAppleConfig {
-	clientID := getEnv("OAUTH_APPLE_CLIENT_ID", "")
+	clientID := getEnv("APPLE_CLIENT_ID", getEnv("OAUTH_APPLE_CLIENT_ID", ""))
 
 	cfg := defaults
 	cfg.ClientID = clientID
-	cfg.Enabled = clientID != ""
-	cfg.JWKSURL = getEnv("OAUTH_APPLE_JWKS_URL", defaults.JWKSURL)
-	cfg.JWKSCacheTTL = getEnvDuration("OAUTH_APPLE_JWKS_CACHE_TTL", defaults.JWKSCacheTTL)
-	cfg.Issuer = getEnv("OAUTH_APPLE_ISSUER", defaults.Issuer)
+	cfg.JWKSURL = getEnv("APPLE_JWKS_URL", getEnv("OAUTH_APPLE_JWKS_URL", defaults.JWKSURL))
+	cfg.JWKSCacheTTL = getEnvDuration("APPLE_JWKS_CACHE_TTL", getEnvDuration("OAUTH_APPLE_JWKS_CACHE_TTL", defaults.JWKSCacheTTL))
+	cfg.Issuer = getEnv("APPLE_ISSUER", getEnv("OAUTH_APPLE_ISSUER", defaults.Issuer))
+
+	if rawEnabled, ok := os.LookupEnv("APPLE_ENABLED"); ok {
+		if enabled, err := strconv.ParseBool(rawEnabled); err == nil {
+			cfg.Enabled = enabled
+		} else {
+			cfg.Enabled = false
+		}
+	} else {
+		cfg.Enabled = clientID != ""
+	}
 
 	return cfg
 }

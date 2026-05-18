@@ -132,6 +132,11 @@ func TestLoad_OAuthDefaults(t *testing.T) {
 	unsetenv(t, "OAUTH_APPLE_JWKS_URL")
 	unsetenv(t, "OAUTH_APPLE_JWKS_CACHE_TTL")
 	unsetenv(t, "OAUTH_APPLE_ISSUER")
+	unsetenv(t, "APPLE_ENABLED")
+	unsetenv(t, "APPLE_CLIENT_ID")
+	unsetenv(t, "APPLE_JWKS_URL")
+	unsetenv(t, "APPLE_JWKS_CACHE_TTL")
+	unsetenv(t, "APPLE_ISSUER")
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
@@ -190,6 +195,57 @@ func TestLoad_OAuthCustomValues(t *testing.T) {
 	assert.Equal(t, "https://apple.example.test", cfg.OAuth.AppleNative.Issuer)
 }
 
+func TestLoad_OAuthAppleNewEnvHasPriorityOverLegacy(t *testing.T) {
+	setenv(t, "OAUTH_APPLE_CLIENT_ID", "legacy.client")
+	setenv(t, "OAUTH_APPLE_JWKS_URL", "https://legacy.apple.test/keys")
+	setenv(t, "OAUTH_APPLE_JWKS_CACHE_TTL", "11m")
+	setenv(t, "OAUTH_APPLE_ISSUER", "https://legacy.apple.test")
+
+	setenv(t, "APPLE_CLIENT_ID", "new.client")
+	setenv(t, "APPLE_JWKS_URL", "https://new.apple.test/keys")
+	setenv(t, "APPLE_JWKS_CACHE_TTL", "22m")
+	setenv(t, "APPLE_ISSUER", "https://new.apple.test")
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	assert.Equal(t, "new.client", cfg.OAuth.AppleNative.ClientID)
+	assert.Equal(t, "https://new.apple.test/keys", cfg.OAuth.AppleNative.JWKSURL)
+	assert.Equal(t, 22*time.Minute, cfg.OAuth.AppleNative.JWKSCacheTTL)
+	assert.Equal(t, "https://new.apple.test", cfg.OAuth.AppleNative.Issuer)
+}
+
+func TestLoad_OAuthAppleEnabledRules(t *testing.T) {
+	t.Run("fallback to client id when APPLE_ENABLED not set", func(t *testing.T) {
+		unsetenv(t, "APPLE_ENABLED")
+		unsetenv(t, "APPLE_CLIENT_ID")
+		unsetenv(t, "OAUTH_APPLE_CLIENT_ID")
+		setenv(t, "OAUTH_APPLE_CLIENT_ID", "legacy.client")
+
+		cfg, err := config.Load()
+		require.NoError(t, err)
+		assert.True(t, cfg.OAuth.AppleNative.Enabled)
+	})
+
+	t.Run("explicit APPLE_ENABLED=false overrides client id", func(t *testing.T) {
+		setenv(t, "APPLE_CLIENT_ID", "new.client")
+		setenv(t, "APPLE_ENABLED", "false")
+
+		cfg, err := config.Load()
+		require.NoError(t, err)
+		assert.False(t, cfg.OAuth.AppleNative.Enabled)
+	})
+
+	t.Run("explicit APPLE_ENABLED=true works without client id", func(t *testing.T) {
+		unsetenv(t, "APPLE_CLIENT_ID")
+		unsetenv(t, "OAUTH_APPLE_CLIENT_ID")
+		setenv(t, "APPLE_ENABLED", "true")
+
+		cfg, err := config.Load()
+		require.NoError(t, err)
+		assert.True(t, cfg.OAuth.AppleNative.Enabled)
+	})
+}
+
 func TestLoad_ProdOAuthPartialCredentials(t *testing.T) {
 	setenv(t, "ENV", "production")
 	setenv(t, "JWT_SECRET", "supersecret")
@@ -231,6 +287,8 @@ func TestLoad_ProdNativeOAuthAppleWithoutNativeRedirectURIs(t *testing.T) {
 	setenv(t, "ENV", "production")
 	setenv(t, "JWT_SECRET", "supersecret")
 	setenv(t, "OAUTH_NATIVE_ENABLED", "true")
+	unsetenv(t, "APPLE_ENABLED")
+	unsetenv(t, "APPLE_CLIENT_ID")
 	setenv(t, "OAUTH_APPLE_CLIENT_ID", "me.foodSea")
 	unsetenv(t, "OAUTH_NATIVE_ALLOWED_REDIRECT_URIS")
 	setenv(t, "OAUTH_ALLOWED_REDIRECT_URIS", "foodsea://legacy/callback")
