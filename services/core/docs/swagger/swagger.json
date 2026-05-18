@@ -206,9 +206,79 @@
                 }
             }
         },
+        "/auth/oauth/native/apple/callback": {
+            "post": {
+                "description": "Accepts Apple identity token and returns auth tokens.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Finish Apple native OAuth flow",
+                "parameters": [
+                    {
+                        "description": "Apple native callback payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthNativeAppleCallbackRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/internal_modules_identity_handler.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_foodsea_core_internal_platform_httputil.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/oauth/native/{provider}/callback": {
             "post": {
-                "description": "Apple native callback contract. For provider=apple send identity_token (required), optional full_name/email. Runtime for google/yandex native callback stays code/state/redirect_uri.",
+                "description": "Exchanges OAuth code from native client and returns auth tokens (google/yandex).",
                 "consumes": [
                     "application/json"
                 ],
@@ -228,12 +298,12 @@
                         "required": true
                     },
                     {
-                        "description": "Apple native callback payload",
+                        "description": "Native OAuth callback payload (code, state, redirect_uri)",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthNativeAppleCallbackRequest"
+                            "$ref": "#/definitions/internal_modules_identity_handler.OAuthCallbackRequest"
                         }
                     }
                 ],

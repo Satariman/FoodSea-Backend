@@ -113,6 +113,7 @@ func setupAuthRouter(h *AuthHandler) *gin.Engine {
 	r.GET("/auth/oauth/:provider/start", h.OAuthStart)
 	r.POST("/auth/oauth/:provider/callback", h.OAuthCallback)
 	r.GET("/auth/oauth/native/:provider/start", h.OAuthNativeStart)
+	r.POST("/auth/oauth/native/apple/callback", h.OAuthNativeAppleCallback)
 	r.POST("/auth/oauth/native/:provider/callback", h.OAuthNativeCallback)
 	r.POST("/auth/oauth/native/:provider/sdk/callback", h.OAuthNativeSDKCallback)
 	r.POST("/auth/logout", middleware.Auth("test-secret"), h.Logout)

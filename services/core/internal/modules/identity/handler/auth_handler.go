@@ -296,12 +296,12 @@ func (h *AuthHandler) OAuthCallback(c *gin.Context) {
 
 // OAuthNativeCallback godoc
 // @Summary      Finish native OAuth flow
-// @Description  Apple native callback contract. For provider=apple send identity_token (required), optional full_name/email. Runtime for google/yandex native callback stays code/state/redirect_uri.
+// @Description  Exchanges OAuth code from native client and returns auth tokens (google/yandex).
 // @Tags         auth
 // @Accept       json
 // @Produce      json
 // @Param        provider path string true "OAuth provider"
-// @Param        body body OAuthNativeAppleCallbackRequest true "Apple native callback payload"
+// @Param        body body OAuthCallbackRequest true "Native OAuth callback payload (code, state, redirect_uri)"
 // @Success      200 {object} httputil.Response{data=AuthResponse}
 // @Failure      400 {object} httputil.Response
 // @Failure      401 {object} httputil.Response
@@ -312,28 +312,6 @@ func (h *AuthHandler) OAuthNativeCallback(c *gin.Context) {
 	provider, err := domain.ParseOAuthProviderName(c.Param("provider"))
 	if err != nil {
 		httputil.HandleError(c, err)
-		return
-	}
-
-	if provider == domain.OAuthProviderApple {
-		var req OAuthNativeAppleCallbackRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			httputil.BadRequest(c, err.Error())
-			return
-		}
-
-		result, err := h.oauthCallback.ExecuteToken(c.Request.Context(), domain.OAuthTokenCallbackRequest{
-			Provider:    provider,
-			AccessToken: req.IdentityToken,
-			FullName:    req.FullName,
-			Email:       req.Email,
-		})
-		if err != nil {
-			httputil.HandleError(c, err)
-			return
-		}
-
-		httputil.OK(c, toAuthResponse(result.User, result.TokenPair))
 		return
 	}
 
@@ -349,6 +327,40 @@ func (h *AuthHandler) OAuthNativeCallback(c *gin.Context) {
 		Code:        req.Code,
 		RedirectURI: req.RedirectURI,
 		Mode:        domain.OAuthFlowModeNative,
+	})
+	if err != nil {
+		httputil.HandleError(c, err)
+		return
+	}
+
+	httputil.OK(c, toAuthResponse(result.User, result.TokenPair))
+}
+
+// OAuthNativeAppleCallback godoc
+// @Summary      Finish Apple native OAuth flow
+// @Description  Accepts Apple identity token and returns auth tokens.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body OAuthNativeAppleCallbackRequest true "Apple native callback payload"
+// @Success      200 {object} httputil.Response{data=AuthResponse}
+// @Failure      400 {object} httputil.Response
+// @Failure      401 {object} httputil.Response
+// @Failure      409 {object} httputil.Response
+// @Failure      500 {object} httputil.Response
+// @Router       /auth/oauth/native/apple/callback [post]
+func (h *AuthHandler) OAuthNativeAppleCallback(c *gin.Context) {
+	var req OAuthNativeAppleCallbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httputil.BadRequest(c, err.Error())
+		return
+	}
+
+	result, err := h.oauthCallback.ExecuteToken(c.Request.Context(), domain.OAuthTokenCallbackRequest{
+		Provider:    domain.OAuthProviderApple,
+		AccessToken: req.IdentityToken,
+		FullName:    req.FullName,
+		Email:       req.Email,
 	})
 	if err != nil {
 		httputil.HandleError(c, err)

@@ -266,6 +266,9 @@ func Load() (*Config, error) {
 	if err := validatePublicOAuthProvider("GOOGLE_NATIVE", cfg.OAuth.GoogleNative); err != nil {
 		return nil, err
 	}
+	if err := validateAppleOAuthProvider(cfg.OAuth.AppleNative); err != nil {
+		return nil, err
+	}
 	if env == "production" && cfg.OAuth.LegacyEnabled && (cfg.OAuth.Google.Enabled || cfg.OAuth.Yandex.Enabled) && len(cfg.OAuth.AllowedRedirectURIs) == 0 {
 		return nil, fmt.Errorf("OAUTH_ALLOWED_REDIRECT_URIS must be set in production when OAuth is enabled")
 	}
@@ -353,6 +356,13 @@ func validatePublicOAuthProvider(provider string, cfg OAuthProviderConfig) error
 		return fmt.Errorf("%s must be set when %s is set", clientIDKey, clientSecretKey)
 	}
 
+	return nil
+}
+
+func validateAppleOAuthProvider(cfg OAuthAppleConfig) error {
+	if cfg.Enabled && strings.TrimSpace(cfg.ClientID) == "" {
+		return fmt.Errorf("APPLE_CLIENT_ID or OAUTH_APPLE_CLIENT_ID must be set when APPLE_ENABLED=true")
+	}
 	return nil
 }
 

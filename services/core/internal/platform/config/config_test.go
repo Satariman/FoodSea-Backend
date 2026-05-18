@@ -235,14 +235,25 @@ func TestLoad_OAuthAppleEnabledRules(t *testing.T) {
 		assert.False(t, cfg.OAuth.AppleNative.Enabled)
 	})
 
-	t.Run("explicit APPLE_ENABLED=true works without client id", func(t *testing.T) {
+	t.Run("explicit APPLE_ENABLED=true without client id returns error", func(t *testing.T) {
 		unsetenv(t, "APPLE_CLIENT_ID")
 		unsetenv(t, "OAUTH_APPLE_CLIENT_ID")
+		setenv(t, "APPLE_ENABLED", "true")
+
+		_, err := config.Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "APPLE_CLIENT_ID")
+	})
+
+	t.Run("explicit APPLE_ENABLED=true works with legacy OAUTH_APPLE_CLIENT_ID", func(t *testing.T) {
+		unsetenv(t, "APPLE_CLIENT_ID")
+		setenv(t, "OAUTH_APPLE_CLIENT_ID", "legacy.client")
 		setenv(t, "APPLE_ENABLED", "true")
 
 		cfg, err := config.Load()
 		require.NoError(t, err)
 		assert.True(t, cfg.OAuth.AppleNative.Enabled)
+		assert.Equal(t, "legacy.client", cfg.OAuth.AppleNative.ClientID)
 	})
 }
 

@@ -124,6 +124,7 @@ func (m *Module) RegisterRoutes(public, protected *gin.RouterGroup) {
 	}
 	if m.nativeOAuthEnabled {
 		auth.GET("/oauth/native/:provider/start", m.authHandler.OAuthNativeStart)
+		auth.POST("/oauth/native/apple/callback", m.authHandler.OAuthNativeAppleCallback)
 		auth.POST("/oauth/native/:provider/callback", m.authHandler.OAuthNativeCallback)
 		if m.yandexSDKEnabled {
 			auth.POST("/oauth/native/:provider/sdk/callback", m.authHandler.OAuthNativeSDKCallback)
